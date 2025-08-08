@@ -1,0 +1,152 @@
+body {
+    font-family: Arial, sans-serif;
+    background: #0b3d91;
+    color: #fff;
+    text-align: center;
+    margin: 0;
+    padding: 0;
+}
+#players {
+    position: relative;
+    width: 1000px;
+    height: 700px;
+    margin: -40px auto;
+    display: block;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    left: 50%;
+    transform: translateX(-50%);
+}
+.player {
+    position: absolute;
+    background: #174ea6;
+    padding: 8px 10px 8px 10px;
+    border-radius: 10px;
+    width: 320px;
+    min-height: 60px;
+    box-sizing: border-box;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    overflow: visible;
+}
+#player1 { left: 340px; bottom: 75px; }
+#player2 { right:10px; top:250px;}
+#player3 { left: 340px; top: 50px; }
+#player4 { left: 10px; top: 250px; }
+#table-center {
+    position: absolute;
+    left: 50%;
+    top: 48%;
+    width: 320px;
+    height: 180px;
+    margin-left: -160px;
+    margin-top: -90px;
+    background: #0e224a;
+    border-radius: 40px;
+    box-shadow: 0 0 30px #0008;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+}
+#table-center h3 {
+    margin: 0 0 10px 0;
+    color: #fff;
+    font-size: 22px;
+}
+#center-cards {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 60px;
+    gap: 20px;
+}
+.cards {
+    width: 100%;
+    min-height: 0;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.cards > div {
+    white-space: nowrap;
+    overflow-x: auto;
+    text-align: left;
+    margin-bottom: 0;
+}
+.card {
+    display: inline-block;
+    background: #fff;
+    color: #000;
+    border-radius: 5px;
+    padding: 2px 7px;
+    margin: 1px;
+    font-weight: bold;
+    box-shadow: 1px 1px 4px #2226;
+    font-size: 15px;
+}
+.card.hearts { color: #d00; }
+.card.diamonds { color: #d00; }
+.card.spades { color: #000; }
+.card.clubs { color: #000; }
+.active-player {
+    box-shadow: 0 0 24px 6px #fff, 0 0 0 4px #ffd700;
+    border: 2px solid #ffd700;
+    z-index: 15;
+}
+.auction-active {
+    box-shadow: 0 0 32px 10px #fff, 0 0 0 4px #00e6ff;
+    border: 2.5px solid #00e6ff;
+    z-index: 4;
+}
+#left-panel {
+    position: fixed;
+    top: 40px;
+    left: 20px;
+    z-index: 5;
+    text-align: left;
+    max-width: 300px;
+}
+#right-panel {
+    position: fixed;
+    top: 0px;
+    right: 60px;
+    z-index: 5;
+    text-align: right;
+    min-width: 220px;
+    max-width: 300px;
+}
+
+#game-section {
+    background: transparent !important;
+}
+
+#lobby-container {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.lobby-container {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+#game-section {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+#join-section, #lobby-section {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+} 

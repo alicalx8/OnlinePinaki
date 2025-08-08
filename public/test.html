@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test</title>
+</head>
+<body>
+    <h1>Test Sayfası</h1>
+    <p>Sunucu çalışıyor mu?</p>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        const socket = io('http://localhost:3000');
+        
+        socket.on('connect', () => {
+            console.log('Bağlandı!');
+            document.body.innerHTML += '<p style="color: green;">✅ WebSocket Bağlantısı Başarılı!</p>';
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('Bağlantı kesildi');
+            document.body.innerHTML += '<p style="color: red;">❌ Bağlantı Kesildi</p>';
+        });
+        
+        socket.on('connect_error', (error) => {
+            console.error('Bağlantı hatası:', error);
+            document.body.innerHTML += '<p style="color: red;">❌ Bağlantı Hatası: ' + error.message + '</p>';
+        });
+    </script>
+</body>
+</html> 

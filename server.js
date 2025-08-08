@@ -9,11 +9,20 @@ const io = socketIo(server, {
     cors: {
         origin: "*",
         methods: ["GET", "POST"]
-    }
+    },
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    transports: ['websocket', 'polling']
 });
 
 // Statik dosyaları serve et
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Hata yönetimi middleware
+app.use((err, req, res, next) => {
+    console.error('Express hatası:', err);
+    res.status(500).json({ error: 'Sunucu hatası' });
+});
 
 // Kart oyunu sabitleri
 const suits = ['♥', '♠', '♦', '♣'];
@@ -88,84 +97,137 @@ function createRoom(roomId) {
 io.on('connection', (socket) => {
     console.log('Yeni bağlantı:', socket.id);
 
+    // Bağlantı durumu kontrolü
+    socket.on('ping', () => {
+        socket.emit('pong');
+    });
+
+    // Pong yanıtı
+    socket.on('pong', () => {
+        // Client'ın pong yanıtını aldık, bağlantı aktif
+        console.log(`Pong alındı: ${socket.id}`);
+    });
+
+    // Bağlantı kesildiğinde temizlik
+    socket.on('disconnect', (reason) => {
+        console.log(`Bağlantı kesildi: ${socket.id}, Sebep: ${reason}`);
+        
+        // Oyuncuyu tüm odalardan çıkar
+        for (const [roomId, room] of rooms.entries()) {
+            const playerIndex = room.players.findIndex(p => p.id === socket.id);
+            if (playerIndex !== -1) {
+                const player = room.players[playerIndex];
+                console.log(`Oyuncu ${player.name} odadan çıktı: ${roomId}`);
+                
+                // Oyuncuyu listeden çıkar
+                room.players.splice(playerIndex, 1);
+                
+                // Diğer oyunculara bildir
+                socket.to(roomId).emit('playerLeft', { 
+                    playerId: playerIndex,
+                    playerName: player.name,
+                    players: room.players.map(p => ({ id: p.id, name: p.name, position: p.position }))
+                });
+                
+                // Oda boşsa odayı sil
+                if (room.players.length === 0) {
+                    rooms.delete(roomId);
+                    console.log(`Oda silindi: ${roomId}`);
+                }
+                break;
+            }
+        }
+    });
+
     // Odaya katılma
     socket.on('joinRoom', (data) => {
-        const { roomId, playerName, isSpectator = false } = data;
-        let room = rooms.get(roomId);
-        
-        if (!room) {
-            room = createRoom(roomId);
-        }
-
-        // Seyirci ise sadece odaya katıl, oyuncu ekleme
-        if (isSpectator) {
-            socket.join(roomId);
+        try {
+            const { roomId, playerName, isSpectator = false } = data;
             
-            // Misafir oyuncuya mevcut oyun durumunu da gönder
-            const spectatorData = { 
-                message: 'Seyirci olarak katıldınız',
-                players: room.players.map(p => ({ id: p.id, name: p.name, position: p.position }))
-            };
-            
-            // Eğer oyun başlamışsa ve kartlar dağıtılmışsa, oyun durumunu da gönder
-            if (room.gameState) {
-                spectatorData.gameState = room.gameState;
-                spectatorData.hasGameStarted = true;
-                spectatorData.playedCards = room.gameState.playedCards || [];
-                spectatorData.trumpSuit = room.gameState.trumpSuit;
-                spectatorData.currentPlayer = room.gameState.currentPlayer;
-                spectatorData.auctionActive = room.gameState.auctionActive;
-                spectatorData.auctionCurrent = room.gameState.auctionCurrent;
-                spectatorData.auctionHighestBid = room.gameState.auctionHighestBid;
+            if (!roomId || !playerName) {
+                socket.emit('error', { message: 'Geçersiz oda ID veya oyuncu adı' });
+                return;
             }
             
-            socket.emit('spectatorJoined', spectatorData);
+            let room = rooms.get(roomId);
             
-            // Diğer oyunculara sadece bilgi mesajı gönder (arayüzü etkilemesin)
-            socket.to(roomId).emit('spectatorInfo', { 
-                message: 'Yeni seyirci katıldı',
-                spectatorName: playerName
+            if (!room) {
+                room = createRoom(roomId);
+            }
+
+            // Seyirci ise sadece odaya katıl, oyuncu ekleme
+            if (isSpectator) {
+                socket.join(roomId);
+                
+                // Misafir oyuncuya mevcut oyun durumunu da gönder
+                const spectatorData = { 
+                    message: 'Seyirci olarak katıldınız',
+                    players: room.players.map(p => ({ id: p.id, name: p.name, position: p.position }))
+                };
+                
+                // Eğer oyun başlamışsa ve kartlar dağıtılmışsa, oyun durumunu da gönder
+                if (room.gameState) {
+                    spectatorData.gameState = room.gameState;
+                    spectatorData.hasGameStarted = true;
+                    spectatorData.playedCards = room.gameState.playedCards || [];
+                    spectatorData.trumpSuit = room.gameState.trumpSuit;
+                    spectatorData.currentPlayer = room.gameState.currentPlayer;
+                    spectatorData.auctionActive = room.gameState.auctionActive;
+                    spectatorData.auctionCurrent = room.gameState.auctionCurrent;
+                    spectatorData.auctionHighestBid = room.gameState.auctionHighestBid;
+                }
+                
+                socket.emit('spectatorJoined', spectatorData);
+                
+                // Diğer oyunculara sadece bilgi mesajı gönder (arayüzü etkilemesin)
+                socket.to(roomId).emit('spectatorInfo', { 
+                    message: 'Yeni seyirci katıldı',
+                    spectatorName: playerName
+                });
+                
+                console.log(`Seyirci ${playerName} oda ${roomId}'ye katıldı`);
+                return;
+            }
+
+            // Aynı isimle oyuncu var mı kontrol et
+            const existingPlayer = room.players.find(p => p.name === playerName);
+            if (existingPlayer) {
+                socket.emit('error', { message: 'Bu isimle bir oyuncu zaten var!' });
+                return;
+            }
+
+            // Oyuncu sayısı kontrolü
+            if (room.players.length >= 4) {
+                socket.emit('roomFull', { message: 'Oda dolu!' });
+                return;
+            }
+
+            // Oyuncuyu odaya ekle
+            const player = {
+                id: socket.id,
+                name: playerName,
+                position: room.players.length
+            };
+            room.players.push(player);
+            socket.join(roomId);
+
+            // Oyuncuya pozisyonunu bildir
+            socket.emit('playerJoined', { 
+                playerId: player.position,
+                players: room.players.map(p => ({ id: p.id, name: p.name, position: p.position }))
             });
-            
-            console.log(`Seyirci ${playerName} oda ${roomId}'ye katıldı`);
-            return;
+
+            // Diğer oyunculara yeni oyuncuyu bildir
+            socket.to(roomId).emit('playerJoined', { 
+                playerId: player.position,
+                players: room.players.map(p => ({ id: p.id, name: p.name, position: p.position }))
+            });
+
+            console.log(`Oyuncu ${playerName} oda ${roomId}'ye katıldı. Pozisyon: ${player.position}`);
+        } catch (error) {
+            console.error('joinRoom hatası:', error);
+            socket.emit('error', { message: 'Oda katılırken bir hata oluştu.' });
         }
-
-        // Aynı isimle oyuncu var mı kontrol et
-        const existingPlayer = room.players.find(p => p.name === playerName);
-        if (existingPlayer) {
-            socket.emit('error', { message: 'Bu isimle bir oyuncu zaten var!' });
-            return;
-        }
-
-        // Oyuncu sayısı kontrolü
-        if (room.players.length >= 4) {
-            socket.emit('roomFull', { message: 'Oda dolu!' });
-            return;
-        }
-
-        // Oyuncuyu odaya ekle
-        const player = {
-            id: socket.id,
-            name: playerName,
-            position: room.players.length
-        };
-        room.players.push(player);
-        socket.join(roomId);
-
-        // Oyuncuya pozisyonunu bildir
-        socket.emit('playerJoined', { 
-            playerId: player.position,
-            players: room.players.map(p => ({ id: p.id, name: p.name, position: p.position }))
-        });
-
-        // Diğer oyunculara yeni oyuncuyu bildir
-        socket.to(roomId).emit('playerJoined', { 
-            playerId: player.position,
-            players: room.players.map(p => ({ id: p.id, name: p.name, position: p.position }))
-        });
-
-        console.log(`Oyuncu ${playerName} oda ${roomId}'ye katıldı. Pozisyon: ${player.position}`);
     });
 
     // Oyun başlatma
@@ -576,25 +638,6 @@ io.on('connection', (socket) => {
         });
 
         console.log(`Kartlar dağıtıldı - Oda: ${roomId}`);
-    });
-
-    // Bağlantı kesildiğinde
-    socket.on('disconnect', () => {
-        console.log('Bağlantı kesildi:', socket.id);
-        
-        // Oyuncuyu odalardan çıkar
-        for (const [roomId, room] of rooms.entries()) {
-            const playerIndex = room.players.findIndex(p => p.id === socket.id);
-            if (playerIndex !== -1) {
-                room.players.splice(playerIndex, 1);
-                io.to(roomId).emit('playerLeft', { playerId: playerIndex });
-                
-                if (room.players.length === 0) {
-                    rooms.delete(roomId);
-                }
-                break;
-            }
-        }
     });
 });
 

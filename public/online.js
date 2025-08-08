@@ -5,21 +5,38 @@ let onlineCurrentPlayer = null;
 let players = [];
 let isOnlineMode = false;
 let isSpectator = false;
+let reconnectAttempts = 0;
+let maxReconnectAttempts = 5;
+let reconnectInterval = null;
 
 // WebSocket bağlantısı
 function connectToServer() {
     console.log('WebSocket bağlantısı kuruluyor...');
+    
+    // Önceki bağlantıyı temizle
+    if (socket) {
+        socket.disconnect();
+        socket = null;
+    }
+    
     try {
-        socket = io('http://localhost:3000');
+        socket = io('http://localhost:3000', {
+            reconnection: true,
+            reconnectionAttempts: maxReconnectAttempts,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            timeout: 20000
+        });
         console.log('Socket.io bağlantısı başlatıldı');
     } catch (error) {
         console.error('Socket.io bağlantı hatası:', error);
-        alert('Sunucu bağlantısı kurulamadı. Lütfen sunucunun çalıştığından emin olun.');
+        handleConnectionError(error);
         return;
     }
     
     socket.on('connect', () => {
         console.log('✅ Sunucuya bağlandı');
+        reconnectAttempts = 0;
         const joinBtn = document.getElementById('join-btn');
         const spectatorBtn = document.getElementById('spectator-btn');
         if (joinBtn) joinBtn.disabled = false;
@@ -28,19 +45,48 @@ function connectToServer() {
         // Global değişkenleri ayarla
         window.socket = socket;
         window.isOnlineMode = true;
+        
+        // Bağlantı başarılı olduğunda hata mesajlarını temizle
+        clearConnectionErrors();
+        
+        // Bağlantı monitoring ve ping/pong mekanizmalarını başlat
+        startConnectionMonitoring();
+        startPingPong();
     });
     
-    socket.on('disconnect', () => {
-        console.log('❌ Sunucu bağlantısı kesildi');
+    socket.on('disconnect', (reason) => {
+        console.log('❌ Sunucu bağlantısı kesildi:', reason);
         const joinBtn = document.getElementById('join-btn');
         const spectatorBtn = document.getElementById('spectator-btn');
         if (joinBtn) joinBtn.disabled = true;
         if (spectatorBtn) spectatorBtn.disabled = true;
+        
+        if (reason === 'io server disconnect') {
+            // Sunucu tarafından bağlantı kesildi
+            console.log('Sunucu tarafından bağlantı kesildi');
+        } else if (reason === 'io client disconnect') {
+            // İstemci tarafından bağlantı kesildi
+            console.log('İstemci tarafından bağlantı kesildi');
+        } else {
+            // Bağlantı hatası
+            console.log('Bağlantı hatası nedeniyle kesildi');
+            handleConnectionError(new Error('Bağlantı kesildi: ' + reason));
+        }
     });
     
     socket.on('connect_error', (error) => {
         console.error('❌ Bağlantı hatası:', error);
-        alert('Sunucu bağlantısı hatası: ' + error.message);
+        handleConnectionError(error);
+    });
+    
+    socket.on('reconnect_attempt', (attemptNumber) => {
+        console.log(`Yeniden bağlanma denemesi ${attemptNumber}/${maxReconnectAttempts}`);
+        reconnectAttempts = attemptNumber;
+    });
+    
+    socket.on('reconnect_failed', () => {
+        console.error('Yeniden bağlanma başarısız oldu');
+        alert('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin ve sayfayı yenileyin.');
     });
     
     socket.on('roomFull', (data) => {
@@ -48,24 +94,113 @@ function connectToServer() {
     });
     
     socket.on('error', (data) => {
-        alert('Hata: ' + data.message);
+        console.error('Sunucu hatası:', data);
+        const errorMessage = data && data.message ? data.message : 'Bilinmeyen hata';
+        alert('Hata: ' + errorMessage);
         // Hata durumunda join section'ı tekrar göster
-        document.getElementById('lobby-section').style.display = 'none';
-        document.getElementById('game-section').style.display = 'none';
-        document.getElementById('join-section').style.display = 'block';
+        const lobbySection = document.getElementById('lobby-section');
+        const gameSection = document.getElementById('game-section');
+        const joinSection = document.getElementById('join-section');
+        
+        if (lobbySection) lobbySection.style.display = 'none';
+        if (gameSection) gameSection.style.display = 'none';
+        if (joinSection) joinSection.style.display = 'block';
     });
     
     socket.on('spectatorInfo', (data) => {
         console.log('Seyirci bilgisi alındı:', data);
         // Bu event diğer oyuncular tarafından alınır, sadece log yaz
-        console.log(`${data.spectatorName} seyirci olarak katıldı`);
+        if (data && data.spectatorName) {
+            console.log(`${data.spectatorName} seyirci olarak katıldı`);
+        }
     });
+    
+    // Hata yönetimi fonksiyonları
+    function handleConnectionError(error) {
+        console.error('Bağlantı hatası işleniyor:', error);
+        
+        // Hata mesajını göster
+        const errorMessage = error && error.message ? error.message : 'Bilinmeyen hata';
+        showConnectionError(`Bağlantı hatası: ${errorMessage}`);
+        
+        // Yeniden bağlanma denemesi
+        if (reconnectAttempts < maxReconnectAttempts) {
+            console.log(`${maxReconnectAttempts - reconnectAttempts} yeniden bağlanma denemesi kaldı`);
+        } else {
+            console.error('Maksimum yeniden bağlanma denemesi aşıldı');
+            showConnectionError('Sunucuya bağlanılamadı. Lütfen sayfayı yenileyin.');
+        }
+    }
+    
+    function showConnectionError(message) {
+        // Hata mesajını göstermek için bir div oluştur veya mevcut olanı güncelle
+        let errorDiv = document.getElementById('connection-error');
+        if (!errorDiv) {
+            errorDiv = document.createElement('div');
+            errorDiv.id = 'connection-error';
+            errorDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #ff4444;
+                color: white;
+                padding: 15px;
+                border-radius: 5px;
+                z-index: 1000;
+                max-width: 300px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            `;
+            document.body.appendChild(errorDiv);
+        }
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        
+        // 5 saniye sonra hata mesajını gizle
+        setTimeout(() => {
+            if (errorDiv) {
+                errorDiv.style.display = 'none';
+            }
+        }, 5000);
+    }
+    
+    function clearConnectionErrors() {
+        const errorDiv = document.getElementById('connection-error');
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
+        }
+    }
+    
+    // Bağlantı durumu kontrolü
+    function startConnectionMonitoring() {
+        if (socket) {
+            // Her 30 saniyede bir bağlantı durumunu kontrol et
+            setInterval(() => {
+                if (socket && !socket.connected) {
+                    console.log('Bağlantı kesildi, yeniden bağlanmaya çalışılıyor...');
+                    handleConnectionError(new Error('Bağlantı kesildi'));
+                }
+            }, 30000);
+        }
+    }
+    
+    // Ping/Pong mekanizması
+    function startPingPong() {
+        if (socket) {
+            setInterval(() => {
+                if (socket && socket.connected) {
+                    socket.emit('ping');
+                }
+            }, 25000);
+        }
+    }
     
     socket.on('spectatorJoined', (data) => {
         console.log('Seyirci katıldı:', data);
         
         // Bu event sadece misafir oyuncu tarafından alınır
-        alert(data.message);
+        if (data && data.message) {
+            alert(data.message);
+        }
         
         // Global değişkenleri ayarla
         window.isSpectator = true;
@@ -73,9 +208,13 @@ function connectToServer() {
         window.players = data.players || players;
         
         // Seyirci için özel arayüz göster
-        document.getElementById('join-section').style.display = 'none';
-        document.getElementById('lobby-section').style.display = 'none';
-        document.getElementById('game-section').style.display = 'block';
+        const joinSection = document.getElementById('join-section');
+        const lobbySection = document.getElementById('lobby-section');
+        const gameSection = document.getElementById('game-section');
+        
+        if (joinSection) joinSection.style.display = 'none';
+        if (lobbySection) lobbySection.style.display = 'none';
+        if (gameSection) gameSection.style.display = 'block';
         
         // Dağıt butonunu zorla görünür hale getir
         const dealBtn = document.getElementById('dealBtn');
@@ -135,10 +274,18 @@ function connectToServer() {
             console.log('Oyun zaten başlamış, durum senkronize ediliyor:', data.gameState);
             
             // Global değişkenleri ayarla
-            window.playersGlobal = data.gameState.players.map(p => p.cards || []);
-            window.currentPlayer = data.currentPlayer;
-            window.trumpSuit = data.trumpSuit;
-            window.playedCards = data.playedCards || [];
+            if (data.gameState.players) {
+                window.playersGlobal = data.gameState.players.map(p => p.cards || []);
+            }
+            if (data.currentPlayer !== undefined) {
+                window.currentPlayer = data.currentPlayer;
+            }
+            if (data.trumpSuit) {
+                window.trumpSuit = data.trumpSuit;
+            }
+            if (data.playedCards) {
+                window.playedCards = data.playedCards;
+            }
             
             // Oyuncu kartlarını render et
             if (window.renderPlayers && window.playersGlobal) {
@@ -147,7 +294,7 @@ function connectToServer() {
             }
             
             // Arayüzü güncelle
-            if (window.renderPlayersWithClick) {
+            if (window.renderPlayersWithClick && data.currentPlayer !== undefined) {
                 window.renderPlayersWithClick(data.currentPlayer);
             }
             
@@ -169,8 +316,9 @@ function connectToServer() {
                     const auctionStatus = document.getElementById('auction-status');
                     const auctionHighestBidDiv = document.getElementById('auction-highest-bid');
                     
-                    if (auctionStatus) {
-                        auctionStatus.innerHTML = `İhale aktif - Sıra: ${window.getPlayerName ? window.getPlayerName(data.auctionCurrent) : `Oyuncu ${data.auctionCurrent + 1}`}`;
+                    if (auctionStatus && data.auctionCurrent !== undefined) {
+                        const playerName = window.getPlayerName ? window.getPlayerName(data.auctionCurrent) : `Oyuncu ${data.auctionCurrent + 1}`;
+                        auctionStatus.innerHTML = `İhale aktif - Sıra: ${playerName}`;
                     }
                     
                     if (auctionHighestBidDiv && data.auctionHighestBid) {
@@ -178,13 +326,15 @@ function connectToServer() {
                     }
                     
                     // Aktif oyuncuyu vurgula
-                    for (let i = 0; i < 4; i++) {
-                        const playerDiv = document.getElementById(`player${i+1}`);
-                        if (playerDiv) {
-                            if (i === data.auctionCurrent) {
-                                playerDiv.classList.add('auction-active');
-                            } else {
-                                playerDiv.classList.remove('auction-active');
+                    if (data.auctionCurrent !== undefined) {
+                        for (let i = 0; i < 4; i++) {
+                            const playerDiv = document.getElementById(`player${i+1}`);
+                            if (playerDiv) {
+                                if (i === data.auctionCurrent) {
+                                    playerDiv.classList.add('auction-active');
+                                } else {
+                                    playerDiv.classList.remove('auction-active');
+                                }
                             }
                         }
                     }
@@ -218,82 +368,100 @@ function connectToServer() {
     
     socket.on('playerJoined', (data) => {
         console.log('Oyuncu katıldı:', data);
-        players = data.players;
-        updatePlayersList();
-        updateStartButton();
+        if (data && data.players) {
+            players = data.players;
+            updatePlayersList();
+            updateStartButton();
+        }
     });
     
     socket.on('playerLeft', (data) => {
         console.log('Oyuncu ayrıldı:', data);
-        players = players.filter(p => p.position !== data.playerId);
-        updatePlayersList();
-        updateStartButton();
+        if (data && data.playerId !== undefined) {
+            players = players.filter(p => p.position !== data.playerId);
+            updatePlayersList();
+            updateStartButton();
+        }
     });
     
     socket.on('gameStarted', (data) => {
         console.log('Oyun başladı:', data);
-        startOnlineGame(data);
+        if (data) {
+            startOnlineGame(data);
+        }
     });
     
     socket.on('cardPlayed', (data) => {
         console.log('Kart oynandı:', data);
-        handleCardPlayed(data);
+        if (data) {
+            handleCardPlayed(data);
+        }
     });
     
     socket.on('nextPlayer', (data) => {
         console.log('Sıradaki oyuncu:', data);
-        handleNextPlayer(data);
+        if (data) {
+            handleNextPlayer(data);
+        }
     });
     
     socket.on('trickEnded', (data) => {
         console.log('El bitti:', data);
-        handleTrickEnded(data);
+        if (data) {
+            handleTrickEnded(data);
+        }
     });
     
     socket.on('bidMade', (data) => {
         console.log('Teklif verildi:', data);
-        handleBidMade(data);
+        if (data) {
+            handleBidMade(data);
+        }
     });
     
     socket.on('playerPassed', (data) => {
         console.log('Oyuncu pas geçti:', data);
-        handlePlayerPassed(data);
+        if (data) {
+            handlePlayerPassed(data);
+        }
     });
     
     socket.on('nextBidder', (data) => {
         console.log('Sıradaki teklifçi:', data);
-        handleNextBidder(data);
+        if (data) {
+            handleNextBidder(data);
+        }
     });
     
     socket.on('trumpSelected', (data) => {
         console.log('Koz seçildi:', data);
-        handleTrumpSelected(data);
+        if (data) {
+            handleTrumpSelected(data);
+        }
     });
     
     socket.on('cardsDealt', (data) => {
         console.log('Kartlar dağıtıldı:', data);
-        window.handleCardsDealt(data);
+        if (data && window.handleCardsDealt) {
+            window.handleCardsDealt(data);
+        }
     });
     
     socket.on('potaMessage', (data) => {
         console.log('Pota mesajı alındı:', data);
-        console.log('Mesaj:', data.message);
-        console.log('Oyuncu ID:', data.playerId);
-        console.log('Oyuncu Adı:', data.playerName);
-        
-        if (window.addPotaMessage) {
-            window.addPotaMessage(data.message, data.playerId + 1);
-            console.log('Pota mesajı chat kutusuna eklendi');
-        } else {
-            console.error('addPotaMessage fonksiyonu bulunamadı!');
+        if (data) {
+            console.log('Mesaj:', data.message);
+            console.log('Oyuncu ID:', data.playerId);
+            console.log('Oyuncu Adı:', data.playerName);
+            
+            if (window.addPotaMessage && data.message) {
+                const playerId = data.playerId !== undefined ? data.playerId + 1 : 'Sistem';
+                window.addPotaMessage(data.message, playerId);
+                console.log('Pota mesajı chat kutusuna eklendi');
+            } else {
+                console.error('addPotaMessage fonksiyonu bulunamadı!');
+            }
         }
-        
-        // Sesli okuma yapmıyoruz - sadece mesajı gönderen oyuncu sesli okuma yapacak
-    });
-    
-    socket.on('cardPlayed', (data) => {
-        console.log('Kart oynandı:', data);
-        handleCardPlayed(data);
     });
     
     socket.on('hideAuctionControls', (data) => {
@@ -312,176 +480,208 @@ function connectToServer() {
     socket.on('sordumMessage', (data) => {
         console.log('Sordum mesajı alındı:', data);
         
-        // Mesaj kutusuna ekle
-        if (window.addPotaMessage) {
-            window.addPotaMessage(`${data.playerName} sordum dedi`, data.playerId + 1);
-        }
-        
-        // Sesli okuma
-        if (window.speakText) {
-            window.speakText(`${data.playerName} sordum dedi`);
-        }
-        
-        // Sordum/Konuş modunu aktif et
-        if (typeof window.sordumKonusMode !== 'undefined') {
-            window.sordumKonusMode = true;
-        }
-        if (typeof window.sordumPlayer !== 'undefined') {
-            window.sordumPlayer = data.playerId;
-        }
-        if (typeof window.auctionTurns !== 'undefined') {
-            window.auctionTurns++;
-        }
-        
-        console.log('Sordum modu aktif edildi:', {
-            sordumKonusMode: window.sordumKonusMode,
-            sordumPlayer: window.sordumPlayer,
-            auctionTurns: window.auctionTurns
-        });
-        
-        // Buton görünürlüğünü güncelle
-        if (window.nextAuctionTurn) {
-            window.nextAuctionTurn();
+        if (data && data.playerName) {
+            // Mesaj kutusuna ekle
+            if (window.addPotaMessage) {
+                const playerId = data.playerId !== undefined ? data.playerId + 1 : 'Sistem';
+                window.addPotaMessage(`${data.playerName} sordum dedi`, playerId);
+            }
+            
+            // Sesli okuma
+            if (window.speakText) {
+                window.speakText(`${data.playerName} sordum dedi`);
+            }
+            
+            // Sordum/Konuş modunu aktif et
+            if (typeof window.sordumKonusMode !== 'undefined') {
+                window.sordumKonusMode = true;
+            }
+            if (typeof window.sordumPlayer !== 'undefined' && data.playerId !== undefined) {
+                window.sordumPlayer = data.playerId;
+            }
+            if (typeof window.auctionTurns !== 'undefined') {
+                window.auctionTurns++;
+            }
+            
+            console.log('Sordum modu aktif edildi:', {
+                sordumKonusMode: window.sordumKonusMode,
+                sordumPlayer: window.sordumPlayer,
+                auctionTurns: window.auctionTurns
+            });
+            
+            // Buton görünürlüğünü güncelle
+            if (window.nextAuctionTurn) {
+                window.nextAuctionTurn();
+            }
         }
     });
     
     socket.on('passMessage', (data) => {
         console.log('Pas mesajı alındı:', data);
         
-        // Mesaj kutusuna ekle
-        if (window.addPotaMessage) {
-            window.addPotaMessage(`${data.playerName} pas`, data.playerId + 1);
-        }
-        
-        // Sesli okuma
-        if (window.speakText) {
-            window.speakText(`${data.playerName} pas`);
+        if (data && data.playerName) {
+            // Mesaj kutusuna ekle
+            if (window.addPotaMessage) {
+                const playerId = data.playerId !== undefined ? data.playerId + 1 : 'Sistem';
+                window.addPotaMessage(`${data.playerName} pas`, playerId);
+            }
+            
+            // Sesli okuma
+            if (window.speakText) {
+                window.speakText(`${data.playerName} pas`);
+            }
         }
     });
     
     socket.on('konusMessage', (data) => {
         console.log('Konuş mesajı alındı:', data);
         
-        // Mesaj kutusuna ekle
-        if (window.addPotaMessage) {
-            window.addPotaMessage(`${data.playerName} konuş dedi`, data.playerId + 1);
-        }
-        
-        // Sesli okuma
-        if (window.speakText) {
-            window.speakText(`${data.playerName} konuş dedi`);
+        if (data && data.playerName) {
+            // Mesaj kutusuna ekle
+            if (window.addPotaMessage) {
+                const playerId = data.playerId !== undefined ? data.playerId + 1 : 'Sistem';
+                window.addPotaMessage(`${data.playerName} konuş dedi`, playerId);
+            }
+            
+            // Sesli okuma
+            if (window.speakText) {
+                window.speakText(`${data.playerName} konuş dedi`);
+            }
         }
     });
     
     socket.on('konusPlayerUpdate', (data) => {
         console.log('Konuş player güncellendi:', data);
         
-        // Konuş player'ı güncelle
-        if (typeof window.konusPlayer !== 'undefined') {
-            window.konusPlayer = data.konusPlayer;
-        }
-        
-        // Buton görünürlüğünü güncelle
-        if (window.nextAuctionTurn) {
-            window.nextAuctionTurn();
+        if (data && data.konusPlayer !== undefined) {
+            // Konuş player'ı güncelle
+            if (typeof window.konusPlayer !== 'undefined') {
+                window.konusPlayer = data.konusPlayer;
+            }
+            
+            // Buton görünürlüğünü güncelle
+            if (window.nextAuctionTurn) {
+                window.nextAuctionTurn();
+            }
         }
     });
     
     socket.on('auctionEnded', (data) => {
         console.log('İhale bitti:', data);
         
-        // İhale mesajını göster
-        const message = `İhale ${data.playerName}'e ${data.winningBid}'ye kaldı`;
-        if (window.addPotaMessage) {
-            window.addPotaMessage(message, data.winner + 1);
-        }
-        
-        // Sesli okuma
-        if (window.speakText) {
-            window.speakText(message);
-        }
-        
-        // İhale bittiğini işle
-        if (window.endAuction) {
-            window.auctionActive = false;
-            window.auctionWinner = data.winner;
-            window.auctionHighestBid = data.winningBid;
-            
-            // Global değişkenleri de güncelle
-            window.auctionActive = false;
-            window.auctionWinner = data.winner;
-            window.auctionHighestBid = data.winningBid;
-            
-            // script.js'deki local değişkenleri de güncelle
-            if (typeof auctionActive !== 'undefined') {
-                auctionActive = false;
-                console.log('auctionActive güncellendi:', auctionActive);
-            } else {
-                // Global scope'da tanımla
-                window.auctionActive = false;
+        if (data && data.playerName && data.winningBid !== undefined) {
+            // İhale mesajını göster
+            const message = `İhale ${data.playerName}'e ${data.winningBid}'ye kaldı`;
+            if (window.addPotaMessage) {
+                const winner = data.winner !== undefined ? data.winner + 1 : 'Sistem';
+                window.addPotaMessage(message, winner);
             }
             
-            // Local auctionWinner değişkenini güncelle
-            try {
-                if (typeof auctionWinner !== 'undefined') {
-                    auctionWinner = data.winner;
-                    console.log('Local auctionWinner güncellendi:', auctionWinner);
+            // Sesli okuma
+            if (window.speakText) {
+                window.speakText(message);
+            }
+            
+            // İhale bittiğini işle
+            if (window.endAuction) {
+                window.auctionActive = false;
+                if (data.winner !== undefined) {
+                    window.auctionWinner = data.winner;
+                }
+                if (data.winningBid !== undefined) {
+                    window.auctionHighestBid = data.winningBid;
+                }
+                
+                // Global değişkenleri de güncelle
+                window.auctionActive = false;
+                if (data.winner !== undefined) {
+                    window.auctionWinner = data.winner;
+                }
+                if (data.winningBid !== undefined) {
+                    window.auctionHighestBid = data.winningBid;
+                }
+                
+                // script.js'deki local değişkenleri de güncelle
+                if (typeof auctionActive !== 'undefined') {
+                    auctionActive = false;
+                    console.log('auctionActive güncellendi:', auctionActive);
                 } else {
                     // Global scope'da tanımla
-                    window.auctionWinner = data.winner;
-                    console.log('Local auctionWinner tanımlı değil, window kullanılıyor');
+                    window.auctionActive = false;
                 }
-            } catch (e) {
-                console.log('Local auctionWinner güncellenemedi, sadece window kullanılıyor');
-                window.auctionWinner = data.winner;
-            }
-            
-            // Window auctionWinner'ı da güncelle
-            window.auctionWinner = data.winner;
-            
-            if (typeof auctionHighestBid !== 'undefined') {
-                auctionHighestBid = data.winningBid;
-                console.log('auctionHighestBid güncellendi:', auctionHighestBid);
-            } else {
-                // Global scope'da tanımla
-                window.auctionHighestBid = data.winningBid;
-            }
-            
-            console.log('İhale bitti - Değişken durumu:', {
-                'window.auctionWinner': window.auctionWinner,
-                'local auctionWinner': typeof auctionWinner !== 'undefined' ? auctionWinner : 'undefined',
-                'data.winner': data.winner
-            });
-            
-            // Sırayı ihale kazanan oyuncuya geçir
-            if (typeof window.currentPlayer !== 'undefined') {
-                window.currentPlayer = data.currentPlayer || data.winner;
-            }
-            if (typeof currentPlayer !== 'undefined') {
-                currentPlayer = data.currentPlayer || data.winner;
-            }
-            
-            // Global currentPlayer değişkenini de güncelle
-            if (typeof window.onlineCurrentPlayer !== 'undefined') {
-                window.onlineCurrentPlayer = data.currentPlayer || data.winner;
-            }
-            
-            window.endAuction();
-            
-            // Koz seçimini başlat
-            if (window.showTrumpSelect) {
-                window.showTrumpSelect();
-            }
-            
-            // Oyuncuları yeniden render et (sıra değişikliğini göstermek için)
-            if (window.renderPlayers && window.playersGlobal) {
-                window.renderPlayers(window.playersGlobal);
-            }
-            
-            // Aktif oyuncuyu güncelle
-            if (window.renderPlayersWithClick) {
-                console.log('Aktif oyuncu güncelleniyor:', data.currentPlayer || data.winner);
-                window.renderPlayersWithClick(data.currentPlayer || data.winner);
+                
+                // Local auctionWinner değişkenini güncelle
+                try {
+                    if (typeof auctionWinner !== 'undefined' && data.winner !== undefined) {
+                        auctionWinner = data.winner;
+                        console.log('Local auctionWinner güncellendi:', auctionWinner);
+                    } else {
+                        // Global scope'da tanımla
+                        if (data.winner !== undefined) {
+                            window.auctionWinner = data.winner;
+                        }
+                        console.log('Local auctionWinner tanımlı değil, window kullanılıyor');
+                    }
+                } catch (e) {
+                    console.log('Local auctionWinner güncellenemedi, sadece window kullanılıyor');
+                    if (data.winner !== undefined) {
+                        window.auctionWinner = data.winner;
+                    }
+                }
+                
+                // Window auctionWinner'ı da güncelle
+                if (data.winner !== undefined) {
+                    window.auctionWinner = data.winner;
+                }
+                
+                if (typeof auctionHighestBid !== 'undefined' && data.winningBid !== undefined) {
+                    auctionHighestBid = data.winningBid;
+                    console.log('auctionHighestBid güncellendi:', auctionHighestBid);
+                } else {
+                    // Global scope'da tanımla
+                    if (data.winningBid !== undefined) {
+                        window.auctionHighestBid = data.winningBid;
+                    }
+                }
+                
+                console.log('İhale bitti - Değişken durumu:', {
+                    'window.auctionWinner': window.auctionWinner,
+                    'local auctionWinner': typeof auctionWinner !== 'undefined' ? auctionWinner : 'undefined',
+                    'data.winner': data.winner
+                });
+                
+                // Sırayı ihale kazanan oyuncuya geçir
+                const currentPlayer = data.currentPlayer !== undefined ? data.currentPlayer : (data.winner !== undefined ? data.winner : 0);
+                
+                if (typeof window.currentPlayer !== 'undefined') {
+                    window.currentPlayer = currentPlayer;
+                }
+                if (typeof currentPlayer !== 'undefined') {
+                    currentPlayer = currentPlayer;
+                }
+                
+                // Global currentPlayer değişkenini de güncelle
+                if (typeof window.onlineCurrentPlayer !== 'undefined') {
+                    window.onlineCurrentPlayer = currentPlayer;
+                }
+                
+                window.endAuction();
+                
+                // Koz seçimini başlat
+                if (window.showTrumpSelect) {
+                    window.showTrumpSelect();
+                }
+                
+                // Oyuncuları yeniden render et (sıra değişikliğini göstermek için)
+                if (window.renderPlayers && window.playersGlobal) {
+                    window.renderPlayers(window.playersGlobal);
+                }
+                
+                // Aktif oyuncuyu güncelle
+                if (window.renderPlayersWithClick) {
+                    console.log('Aktif oyuncu güncelleniyor:', currentPlayer);
+                    window.renderPlayersWithClick(currentPlayer);
+                }
             }
         }
     });

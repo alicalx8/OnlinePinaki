@@ -387,7 +387,10 @@ function renderPlayersWithClick(activePlayer) {
     }
     
     // Elin başında ilk atılan kartın rengi (leadSuit) belirlenir
-    let leadSuit = window.playedCards && window.playedCards.length > 0 ? window.playedCards[0].card.suit : null;
+    let leadSuit = null;
+    if (window.playedCards && window.playedCards.length > 0 && window.playedCards[0] && window.playedCards[0].card) {
+        leadSuit = window.playedCards[0].card.suit;
+    }
     
     for (let i = 0; i < 4; i++) {
         const playerDiv = document.getElementById(`player${i+1}`);
@@ -414,16 +417,16 @@ function renderPlayersWithClick(activePlayer) {
         let allowedCards = null;
         if (i === activePlayer && !leadSuit) {
             // İlk kart atan oyuncu - istediği kartı atabilir
-            allowedCards = window.playersGlobal[i];
+            allowedCards = window.playersGlobal[i] || [];
         } else if (i === activePlayer && leadSuit) {
             const hand = window.playersGlobal[i];
-            if (!hand) {
-                console.error(`player${i+1} için el bulunamadı`);
+            if (!hand || !Array.isArray(hand)) {
+                console.error(`player${i+1} için geçerli el bulunamadı`);
                 continue;
             }
             
-            const hasLeadSuit = hand.some(c => c.suit === leadSuit);
-            const hasTrump = window.trumpSuit && hand.some(c => c.suit === window.trumpSuit);
+            const hasLeadSuit = hand.some(c => c && c.suit === leadSuit);
+            const hasTrump = window.trumpSuit && hand.some(c => c && c.suit === window.trumpSuit);
             
             console.log(`Oyuncu ${i + 1} - Hand:`, hand);
             console.log(`LeadSuit: ${leadSuit}, TrumpSuit: ${window.trumpSuit}`);
@@ -432,48 +435,59 @@ function renderPlayersWithClick(activePlayer) {
             // Eğer açılan kart koz ise, koz yükseltme zorunluluğu uygula
             if (leadSuit === window.trumpSuit && hasTrump) {
                 // Masadaki en yüksek kozun sırasını bul
-                const playedTrumps = window.playedCards.filter(pc => pc.card.suit === window.trumpSuit).map(pc => pc.card);
+                const playedTrumps = window.playedCards ? window.playedCards.filter(pc => pc && pc.card && pc.card.suit === window.trumpSuit).map(pc => pc.card) : [];
                 let maxTrumpRankIdx = -1;
                 if (playedTrumps.length > 0) {
                     maxTrumpRankIdx = Math.min(...playedTrumps.map(c => rankOrder.indexOf(c.rank)));
                 }
                 // Elinde daha yüksek koz var mı?
-                const higherTrumps = hand.filter(c => c.suit === window.trumpSuit && rankOrder.indexOf(c.rank) < maxTrumpRankIdx);
+                const higherTrumps = hand.filter(c => c && c.suit === window.trumpSuit && rankOrder.indexOf(c.rank) < maxTrumpRankIdx);
                 if (playedTrumps.length > 0 && higherTrumps.length > 0) {
                     allowedCards = higherTrumps;
                 } else {
-                    allowedCards = hand.filter(c => c.suit === window.trumpSuit);
+                    allowedCards = hand.filter(c => c && c.suit === window.trumpSuit);
                 }
             } else if (hasLeadSuit) {
                 // Açılan rengi takip et
-                allowedCards = hand.filter(c => c.suit === leadSuit);
+                allowedCards = hand.filter(c => c && c.suit === leadSuit);
             } else if (hasTrump) {
                 // Masada koz var mı?
-                const playedTrumps = window.playedCards.filter(pc => pc.card.suit === window.trumpSuit).map(pc => pc.card);
+                const playedTrumps = window.playedCards ? window.playedCards.filter(pc => pc && pc.card && pc.card.suit === window.trumpSuit).map(pc => pc.card) : [];
                 let maxTrumpRankIdx = -1;
                 if (playedTrumps.length > 0) {
                     maxTrumpRankIdx = Math.min(...playedTrumps.map(c => rankOrder.indexOf(c.rank)));
                 }
                 // Elinde daha yüksek koz var mı?
-                const higherTrumps = hand.filter(c => c.suit === window.trumpSuit && rankOrder.indexOf(c.rank) < maxTrumpRankIdx);
+                const higherTrumps = hand.filter(c => c && c.suit === window.trumpSuit && rankOrder.indexOf(c.rank) < maxTrumpRankIdx);
                 if (playedTrumps.length > 0 && higherTrumps.length > 0) {
                     allowedCards = higherTrumps;
                 } else {
-                    allowedCards = hand.filter(c => c.suit === window.trumpSuit);
+                    allowedCards = hand.filter(c => c && c.suit === window.trumpSuit);
                 }
             } else {
                 // Hiçbir kural yoksa istediği kartı atabilir
                 allowedCards = hand;
             }
         }
+        
+        // Kartları render et
+        const currentHand = window.playersGlobal[i];
+        if (!currentHand || !Array.isArray(currentHand)) {
+            console.error(`player${i+1} için geçerli el bulunamadı`);
+            continue;
+        }
+        
         for (const suit of suitOrder) {
             const rowDiv = document.createElement('div');
             rowDiv.style.marginBottom = '2px';
-            const suitCards = sortPlayerCards(window.playersGlobal[i]).filter(card => card.suit === suit);
+            const suitCards = sortPlayerCards(currentHand).filter(card => card && card.suit === suit);
             suitCards.forEach((card, idx) => {
+                if (!card) return; // Geçersiz kart atla
+                
                 const cardDiv = document.createElement('span');
                 cardDiv.className = 'card ' + suitClass[card.suit];
                 cardDiv.textContent = card.rank + card.suit;
+                
                 // Sadece aktif oyuncu için tıklanabilirlik ver
                 if (i === activePlayer) {
                     // Misafir oyuncu kontrolü
@@ -487,14 +501,14 @@ function renderPlayersWithClick(activePlayer) {
                     } else {
                         // İnsan oyuncu için tıklanabilirlik ver
                         let canPlay = true;
-                        if (leadSuit) {
-                            canPlay = allowedCards.some(c => c.suit === card.suit && c.rank === card.rank);
+                        if (leadSuit && allowedCards) {
+                            canPlay = allowedCards.some(c => c && c.suit === card.suit && c.rank === card.rank);
                         }
                         
                         // Debug bilgisi ekle
                         if (i === activePlayer) {
                             console.log(`Oyuncu ${i + 1} - Kart: ${card.rank}${card.suit}`);
-                            console.log(`LeadSuit: ${leadSuit}, TrumpSuit: ${trumpSuit}`);
+                            console.log(`LeadSuit: ${leadSuit}, TrumpSuit: ${window.trumpSuit}`);
                             console.log(`AllowedCards:`, allowedCards);
                             console.log(`CanPlay: ${canPlay}`);
                         }
@@ -1253,7 +1267,7 @@ document.getElementById('boz-btn').addEventListener('click', () => {
     
     // İhaleyi sıfırla ve yeniden başlat
     startAuction();
-});
+}
 
 // Kartlar dağıtıldıktan sonra ihale başlat
 function setupDealButton() {

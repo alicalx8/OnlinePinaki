@@ -5,7 +5,12 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "build": "npm run build:copy",
+    "build:copy": "node scripts/build.js",
+    "build:minify": "node scripts/minify.js",
+    "postinstall": "npm run build",
+    "heroku-postbuild": "npm run build"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -16,5 +21,8 @@
   },
   "keywords": ["pinaki", "kart", "oyun", "online"],
   "author": "Pinaki Team",
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
 } 

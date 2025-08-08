@@ -3,6 +3,9 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 
+// PORT değişkenini tanımla
+const PORT = process.env.PORT || 3000;
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
@@ -15,8 +18,52 @@ const io = socketIo(server, {
     transports: ['websocket', 'polling']
 });
 
-// Statik dosyaları serve et
-app.use(express.static(path.join(__dirname, 'public')));
+// JSON parsing middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// API route'ları
+app.use('/api', (req, res, next) => {
+    console.log(`API isteği: ${req.method} ${req.path}`);
+    next();
+});
+
+// API endpoint'leri
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
+
+app.get('/api/rooms', (req, res) => {
+    const roomList = Array.from(rooms.keys()).map(roomId => ({
+        id: roomId,
+        playerCount: rooms.get(roomId)?.players?.length || 0,
+        gameState: rooms.get(roomId)?.gameState ? 'active' : 'waiting'
+    }));
+    res.json({ rooms: roomList });
+});
+
+// Build klasöründen statik dosyaları servis et
+app.use(express.static(path.join(__dirname, 'build')));
+
+// Ana sayfa route'u - online.html'i döndür
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'build', 'online.html'));
+});
+
+// SPA routing - tüm diğer route'lar için online.html döndür
+app.get('*', (req, res) => {
+    // API route'ları için online.html döndürme
+    if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'API endpoint bulunamadı' });
+    }
+    
+    // Statik dosyalar için online.html döndürme
+    res.sendFile(path.join(__dirname, 'build', 'online.html'));
+});
 
 // Hata yönetimi middleware
 app.use((err, req, res, next) => {
@@ -668,7 +715,9 @@ function findTrickWinner(playedCards, trumpSuit) {
     return playedCards[bestIdx].player;
 }
 
-const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-    console.log(`Sunucu ${PORT} portunda çalışıyor`);
+    console.log(`🚀 Sunucu ${PORT} portunda çalışıyor`);
+    console.log(`📁 Statik dosyalar: ${path.join(__dirname, 'build')}`);
+    console.log(`🔗 API endpoint'leri: http://localhost:${PORT}/api`);
+    console.log(`🌐 Web uygulaması: http://localhost:${PORT}`);
 }); 

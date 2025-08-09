@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Strateji Testi</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .card {
+            display: inline-block;
+            padding: 8px 12px;
+            margin: 4px;
+            border: 2px solid #333;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .hearts { color: red; border-color: red; }
+        .diamonds { color: red; border-color: red; }
+        .spades { color: black; border-color: black; }
+        .clubs { color: black; border-color: black; }
+        .test-result {
+            background: #e8f5e8;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .test-error {
+            background: #ffe8e8;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .hand-display {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🤖 Bot Strateji Testi</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Basit Kart Oynama</h2>
+        <div class="hand-display">
+            <strong>El:</strong> 
+            <span class="card hearts">A♥</span>
+            <span class="card hearts">10♥</span>
+            <span class="card spades">K♠</span>
+            <span class="card clubs">Q♣</span>
+        </div>
+        <button onclick="testBasicPlay()">Test Et</button>
+        <div id="test1-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Koz Stratejisi</h2>
+        <div class="hand-display">
+            <strong>El:</strong> 
+            <span class="card hearts">A♥</span>
+            <span class="card hearts">10♥</span>
+            <span class="card hearts">K♥</span>
+            <span class="card spades">Q♠</span>
+        </div>
+        <div class="hand-display">
+            <strong>Koz:</strong> ♥
+        </div>
+        <button onclick="testTrumpStrategy()">Test Et</button>
+        <div id="test2-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Partner Stratejisi</h2>
+        <div class="hand-display">
+            <strong>El:</strong> 
+            <span class="card spades">A♠</span>
+            <span class="card spades">10♠</span>
+            <span class="card clubs">K♣</span>
+        </div>
+        <div class="hand-display">
+            <strong>Masada:</strong> 
+            <span class="card spades">Q♠</span> (Partner)
+            <span class="card hearts">J♥</span>
+            <span class="card diamonds">9♦</span>
+        </div>
+        <button onclick="testPartnerStrategy()">Test Et</button>
+        <div id="test3-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 4: İhale Teklifi</h2>
+        <div class="hand-display">
+            <strong>El:</strong> 
+            <span class="card hearts">A♥</span>
+            <span class="card hearts">10♥</span>
+            <span class="card hearts">K♥</span>
+            <span class="card hearts">Q♥</span>
+            <span class="card spades">A♠</span>
+            <span class="card spades">10♠</span>
+        </div>
+        <div class="hand-display">
+            <strong>Koz:</strong> ♥
+        </div>
+        <button onclick="testBidding()">Test Et</button>
+        <div id="test4-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 5: Koz Seçimi</h2>
+        <div class="hand-display">
+            <strong>El:</strong> 
+            <span class="card hearts">A♥</span>
+            <span class="card hearts">10♥</span>
+            <span class="card hearts">K♥</span>
+            <span class="card spades">A♠</span>
+            <span class="card spades">10♠</span>
+            <span class="card clubs">A♣</span>
+        </div>
+        <button onclick="testTrumpSelection()">Test Et</button>
+        <div id="test5-result"></div>
+    </div>
+
+    <script src="bot.js"></script>
+    <script>
+        // Test fonksiyonları
+        function testBasicPlay() {
+            try {
+                const bot = new PinakiBot(1);
+                const hand = [
+                    { suit: '♥', rank: 'A' },
+                    { suit: '♥', rank: '10' },
+                    { suit: '♠', rank: 'K' },
+                    { suit: '♣', rank: 'Q' }
+                ];
+                
+                const card = bot.playCard(hand, null, null, []);
+                const result = card ? `${card.rank}${card.suit}` : 'Kart bulunamadı';
+                
+                document.getElementById('test1-result').innerHTML = 
+                    `<div class="test-result">✅ Test başarılı! Seçilen kart: ${result}</div>`;
+            } catch (error) {
+                document.getElementById('test1-result').innerHTML = 
+                    `<div class="test-error">❌ Test hatası: ${error.message}</div>`;
+            }
+        }
+
+        function testTrumpStrategy() {
+            try {
+                const bot = new PinakiBot(1);
+                const hand = [
+                    { suit: '♥', rank: 'A' },
+                    { suit: '♥', rank: '10' },
+                    { suit: '♥', rank: 'K' },
+                    { suit: '♠', rank: 'Q' }
+                ];
+                
+                const card = bot.playCard(hand, null, '♥', []);
+                const result = card ? `${card.rank}${card.suit}` : 'Kart bulunamadı';
+                
+                document.getElementById('test2-result').innerHTML = 
+                    `<div class="test-result">✅ Test başarılı! Seçilen kart: ${result}</div>`;
+            } catch (error) {
+                document.getElementById('test2-result').innerHTML = 
+                    `<div class="test-error">❌ Test hatası: ${error.message}</div>`;
+            }
+        }
+
+        function testPartnerStrategy() {
+            try {
+                const bot = new PinakiBot(1);
+                const hand = [
+                    { suit: '♠', rank: 'A' },
+                    { suit: '♠', rank: '10' },
+                    { suit: '♣', rank: 'K' }
+                ];
+                
+                const playedCards = [
+                    { card: { suit: '♠', rank: 'Q' }, player: 2 }, // Partner
+                    { card: { suit: '♥', rank: 'J' }, player: 3 },
+                    { card: { suit: '♦', rank: '9' }, player: 0 }
+                ];
+                
+                const card = bot.playCard(hand, '♠', null, playedCards);
+                const result = card ? `${card.rank}${card.suit}` : 'Kart bulunamadı';
+                
+                document.getElementById('test3-result').innerHTML = 
+                    `<div class="test-result">✅ Test başarılı! Seçilen kart: ${result}</div>`;
+            } catch (error) {
+                document.getElementById('test3-result').innerHTML = 
+                    `<div class="test-error">❌ Test hatası: ${error.message}</div>`;
+            }
+        }
+
+        function testBidding() {
+            try {
+                const bot = new PinakiBot(1);
+                const hand = [
+                    { suit: '♥', rank: 'A' },
+                    { suit: '♥', rank: '10' },
+                    { suit: '♥', rank: 'K' },
+                    { suit: '♥', rank: 'Q' },
+                    { suit: '♠', rank: 'A' },
+                    { suit: '♠', rank: '10' }
+                ];
+                
+                const bid = bot.makeBid(150, hand, '♥');
+                const result = bid ? `${bid} puan` : 'Pas geç';
+                
+                document.getElementById('test4-result').innerHTML = 
+                    `<div class="test-result">✅ Test başarılı! Teklif: ${result}</div>`;
+            } catch (error) {
+                document.getElementById('test4-result').innerHTML = 
+                    `<div class="test-error">❌ Test hatası: ${error.message}</div>`;
+            }
+        }
+
+        function testTrumpSelection() {
+            try {
+                const bot = new PinakiBot(1);
+                const hand = [
+                    { suit: '♥', rank: 'A' },
+                    { suit: '♥', rank: '10' },
+                    { suit: '♥', rank: 'K' },
+                    { suit: '♠', rank: 'A' },
+                    { suit: '♠', rank: '10' },
+                    { suit: '♣', rank: 'A' }
+                ];
+                
+                const trump = bot.selectTrump(hand);
+                const result = trump || 'Seçim yapılamadı';
+                
+                document.getElementById('test5-result').innerHTML = 
+                    `<div class="test-result">✅ Test başarılı! Seçilen koz: ${result}</div>`;
+            } catch (error) {
+                document.getElementById('test5-result').innerHTML = 
+                    `<div class="test-error">❌ Test hatası: ${error.message}</div>`;
+            }
+        }
+
+        // Sayfa yüklendiğinde bot manager'ı başlat
+        window.addEventListener('load', function() {
+            console.log('Bot test sayfası yüklendi');
+            console.log('Bot Manager:', window.botManager);
+        });
+    </script>
+</body>
+</html>

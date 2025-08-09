@@ -165,6 +165,7 @@ function startAuction() {
     auctionTurns = 0;
     // Koz seçimini sıfırla
     trumpSuit = null;
+    window.trumpSuit = null;
     // Samandağ Pinaki değişkenlerini sıfırla
     sordumKonusMode = false;
     sordumPlayer = null;
@@ -372,6 +373,7 @@ function hideTrumpSelect() {
 }
 
 let playedCards = [];
+window.playedCards = playedCards;
 window.currentPlayer = null; // Sırası gelen oyuncu
 let firstPlayerOfTrick = null; // Elin ilk oyuncusu
 
@@ -392,6 +394,12 @@ function enableFirstPlay() {
     
     if (window.renderPlayersWithClick) {
         window.renderPlayersWithClick(window.currentPlayer);
+    }
+    // Eğer ilk kartı atacak oyuncu bot ise otomatik oynat
+    if (window.botManager && window.botManager.isBotActive(window.currentPlayer)) {
+        setTimeout(() => {
+            botPlayCard(window.currentPlayer);
+        }, 1000);
     }
 }
 
@@ -592,6 +600,7 @@ function playCard(playerIdx, card, suit, idxInSuit) {
     }
     // Masaya ekle
     playedCards.push({ player: playerIdx, card });
+    window.playedCards = playedCards;
     renderCenterCards();
     
     // Bot kontrolü - sıradaki oyuncu bot mu?
@@ -627,6 +636,7 @@ function playCard(playerIdx, card, suit, idxInSuit) {
                 else team2Tricks.push(...trickCards);
             }
             playedCards = [];
+            window.playedCards = [];
             renderCenterCards();
             firstPlayerOfTrick = winner;
             window.currentPlayer = winner;
@@ -905,6 +915,8 @@ Array.from(document.getElementsByClassName('trump-btn')).forEach(btn => {
         }
         
         trumpSuit = this.getAttribute('data-suit');
+        // Global değişkeni de set et (offline akış tıklanabilirlik için kritik)
+        window.trumpSuit = trumpSuit;
         // Kozun Türkçe adını belirle
         let kozAd = '';
         switch(trumpSuit) {
@@ -954,6 +966,7 @@ function botSelectTrump(playerIdx) {
     
     if (selectedTrump) {
         trumpSuit = selectedTrump;
+        window.trumpSuit = trumpSuit;
         // Kozun Türkçe adını belirle
         let kozAd = '';
         switch(trumpSuit) {
@@ -1291,6 +1304,7 @@ document.getElementById('boz-btn').addEventListener('click', () => {
     deck = shuffle(deck);
     const players = dealCards(deck);
     playersGlobal = players;
+    window.playersGlobal = players;
     playedCards = [];
     team1Tricks = [];
     team2Tricks = [];
@@ -1299,13 +1313,17 @@ document.getElementById('boz-btn').addEventListener('click', () => {
     renderCenterCards();
     
     // İhaleyi sıfırla ve yeniden başlat
-    startAuction()
+    window.offlineStartAuction()
 })
 
 // Kartlar dağıtıldıktan sonra ihale başlat
 function setupDealButton() {
     const dealBtn = document.getElementById('dealBtn');
     if (dealBtn) {
+        // Aynı dinleyicinin birden fazla kez eklenmesini engelle
+        if (dealBtn.dataset.listenerAttached === 'true') {
+            return;
+        }
         dealBtn.addEventListener('click', () => {
             console.log('Kartları dağıt butonuna tıklandı');
             
@@ -1406,15 +1424,18 @@ function setupDealButton() {
             deck = shuffle(deck);
             const players = dealCards(deck);
             playersGlobal = players;
+            window.playersGlobal = players;
             playedCards = [];
+            window.playedCards = [];
             team1Tricks = [];
             team2Tricks = [];
             lastTrickWinnerTeam = null;
             renderPlayers(players);
             renderCenterCards();
-            startAuction();
+            window.offlineStartAuction();
         });
         console.log('Kartları dağıt butonu event listener eklendi');
+        dealBtn.dataset.listenerAttached = 'true';
     } else {
         console.error('dealBtn bulunamadı!');
     }
@@ -1792,8 +1813,10 @@ window.onload = function() {
 window.renderCenterCards = renderCenterCards;
 window.renderPlayersWithClick = renderPlayersWithClick;
 window.getPlayerName = getPlayerName;
-window.addPotaMessage = addPotaMessage;
+// addPotaMessage fonksiyonu onload içinde window.addPotaMessage olarak tanımlanıyor;
+// burada isme bağlı atama yapmayalım (global isim mevcut olmayabilir)
 window.startAuction = startAuction;
+window.offlineStartAuction = startAuction;
 window.renderPlayers = renderPlayers;
 window.calculateAndShowScores = calculateAndShowScores;
 window.speakText = speakText;

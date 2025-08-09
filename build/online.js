@@ -1224,6 +1224,7 @@ function setupEventListeners() {
     
     // Odaya katıl butonu
     const joinBtn = document.getElementById('join-btn');
+    const botsVsBtn = document.getElementById('bots-vs-btn');
     console.log('join-btn elementi:', joinBtn);
     if (joinBtn) {
         // Mevcut event listener'ları temizle
@@ -1277,6 +1278,86 @@ function setupEventListeners() {
         console.log('Misafir butonu event listener eklendi');
     } else {
         console.error('Misafir butonu bulunamadı!');
+    }
+
+    // Botlara karşı oyna
+    if (botsVsBtn) {
+        botsVsBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Botlara Karşı Oyna butonuna tıklandı');
+
+            // Girdi değerleri
+            const roomIdInput = document.getElementById('room-id');
+            const playerNameInput = document.getElementById('player-name');
+            const playerName = (playerNameInput ? playerNameInput.value.trim() : '') || 'Oyuncu';
+
+            // Offline moda geç (sunucu bağımlılığını kaldır)
+            try { if (socket && socket.connected) socket.disconnect() } catch (_) {}
+            socket = null;
+            window.isOnlineMode = false;
+            window.isSpectator = false;
+            // Dağıtım kontrolü için aktif oyuncuyu sıfırla (dağıtıcı dışında engeli kaldır)
+            try { window.currentPlayer = null } catch (_) {}
+
+            // Arayüz: oyun ekranını aç, join/lobby'yi gizle
+            const joinSection = document.getElementById('join-section');
+            const lobbySection = document.getElementById('lobby-section');
+            const gameSection = document.getElementById('game-section');
+            if (joinSection) joinSection.style.display = 'none';
+            if (lobbySection) lobbySection.style.display = 'none';
+            if (gameSection) gameSection.style.display = 'block';
+
+            // 4 koltuğu hazırla: 1 insan + 3 bot
+            const offlinePlayers = [
+                { id: 'human-local', name: playerName, position: 0 },
+                { id: 'bot-1', name: 'Bot 2', position: 1 },
+                { id: 'bot-2', name: 'Bot 3', position: 2 },
+                { id: 'bot-3', name: 'Bot 4', position: 3 }
+            ];
+            // online.js yerel durumu ve globali güncelle
+            players = offlinePlayers;
+            window.players = offlinePlayers;
+
+            // Oyuncu isimlerini UI'da göster ve dağıt butonunu görünür yap
+            updatePlayerNames();
+
+            // Botları aktifleştir (insan dışındaki tüm pozisyonlar)
+            if (window.botManager) {
+                for (let i = 1; i < 4; i++) window.botManager.createBot(i);
+            }
+
+            // Offline UI/akış init (script.js onload atlandıysa elle kur)
+            try {
+                if (typeof window.setupDealButton === 'function') window.setupDealButton(); // script.js içinde tanımlı
+                if (typeof window.setupBidButton === 'function') window.setupBidButton(); // script.js içinde tanımlı
+                if (typeof window.setupBotControls === 'function') window.setupBotControls(); // script.js içinde tanımlı
+                if (typeof window.updateDealButton === 'function') window.updateDealButton();
+            } catch (_) {}
+
+            // Skor tablosunu görünür yap (offline başlangıç)
+            const scoreTable = document.getElementById('score-table');
+            if (scoreTable) scoreTable.style.display = 'block';
+
+            // Biraz gecikmeyle kartları dağıt (offline akış)
+            setTimeout(() => {
+                const dealBtn = document.getElementById('dealBtn');
+                if (dealBtn) dealBtn.click();
+                // Fallback: kısa süre sonra ihale kontrolleri görünmüyorsa başlatmayı zorla
+                setTimeout(() => {
+                    const auctionControls = document.getElementById('auction-controls');
+                    const auctionStatus = document.getElementById('auction-status');
+                    const notStarted = auctionControls && auctionControls.style.display === 'none';
+                    if (notStarted) {
+                        if (typeof window.offlineStartAuction === 'function') window.offlineStartAuction();
+                        else if (auctionControls) auctionControls.style.display = 'block';
+                        if (auctionStatus && auctionStatus.textContent.includes('Kartlar dağıtıldıktan sonra')) {
+                            auctionStatus.textContent = 'İhale başladı! (En az 150)';
+                        }
+                    }
+                }, 500);
+            }, 250);
+        });
     }
     
     // Oyunu başlat butonu
@@ -1341,10 +1422,10 @@ function setupEventListeners() {
                     console.error('dealCardsOnline fonksiyonu bulunamadı!');
                     socket.emit('dealCards', { roomId: currentRoom });
                 }
-            } else {
-                console.error('Online mod veya socket yok!');
-                alert('Online mod aktif değil veya sunucu bağlantısı yok!');
+                return;
             }
+            // Offline mod: burada hiçbir şey yapma, public/script.js içindeki listener offline dağıtımı yönetiyor
+            console.log('Offline modda dağıtım, script.js listener devreye girecek');
         });
         console.log('Kartları dağıt butonu event listener eklendi');
     } else {

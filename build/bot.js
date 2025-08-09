@@ -198,10 +198,32 @@ class BotManager {
 
     // Bot'un ihale teklifi vermesi
     botMakeBid(playerId, currentHighestBid, hand, trumpSuit) {
-        const bot = this.bots.get(playerId);
-        if (!bot || !this.isBotActive(playerId)) return null;
-        
-        return bot.makeBid(currentHighestBid, hand, trumpSuit);
+        // Özel teklif kuralı: başlangıç puanı + (alabileceği el sayısı*20) + 30
+        // Basitleştirme: başlangıç puanını mevcut el puan hesabından çıkar, alabileceği el sayısını kaba tahmin et
+        const basePoints = this.calculateStartPoints(hand, trumpSuit);
+        const tricksPotential = this.estimateTricks(hand, trumpSuit);
+        const proposed = basePoints + tricksPotential * 20 + 30;
+        const bid = Math.floor(proposed / 10) * 10; // 10'luk yuvarla
+
+        if (bid < 150 || (currentHighestBid && bid <= currentHighestBid)) return null;
+        return bid;
+    }
+
+    calculateStartPoints(hand, trumpSuit) {
+        if (!hand) return 0;
+        const rankValues = { 'A': 10, '10': 10, 'K': 5, 'Q': 5, 'J': 0, '9': 0 };
+        let value = 0;
+        for (const c of hand) value += rankValues[c.rank] || 0;
+        if (trumpSuit) value += hand.filter(c => c.suit === trumpSuit).length * 5;
+        return value;
+    }
+
+    estimateTricks(hand, trumpSuit) {
+        if (!hand) return 0;
+        // Çok kaba: As ve 10'ların sayısı + koz sayısı/3
+        const high = hand.filter(c => c.rank === 'A' || c.rank === '10').length;
+        const trumps = hand.filter(c => c.suit === trumpSuit).length;
+        return Math.min(10, high + Math.floor(trumps / 3));
     }
 
     // Bot'un koz seçimi

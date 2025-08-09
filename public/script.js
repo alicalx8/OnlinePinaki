@@ -294,6 +294,12 @@ function endAuction() {
     auctionActive = false;
     document.getElementById('auction-controls').style.display = 'none';
     updateAuctionHighestBid();
+    // Online modda winner ve bid sunucudan gelir; yerel hesaplama ile üzerine yazmayalım
+    if (window.isOnlineMode) {
+        // Sunucudan set edilmiş değerleri koru, sadece UI kapat
+        // window.auctionWinner ve window.auctionHighestBid zaten online.js tarafından set ediliyor
+        return;
+    }
     // En yüksek teklifi veren oyuncuyu bul
     let maxBid = -1;
     let winner = null;
@@ -1296,8 +1302,8 @@ document.getElementById('boz-btn').addEventListener('click', () => {
     renderCenterCards();
     
     // İhaleyi sıfırla ve yeniden başlat
-    startAuction();
-}
+    startAuction()
+})
 
 // Kartlar dağıtıldıktan sonra ihale başlat
 function setupDealButton() {
@@ -1647,6 +1653,7 @@ window.updateDealButton = function() {
 }
 
 window.onload = function() {
+    console.log('[script.js] onload çalıştı, window fonksiyonları atanıyor')
     // Online modda ise bu fonksiyonları çalıştırma
     if (window.isOnlineMode) {
         console.log('Online mod aktif, script.js onload fonksiyonları atlanıyor');
@@ -1798,3 +1805,7 @@ window.endAuction = endAuction;
 window.showTrumpSelect = showTrumpSelect;
 window.hideTrumpSelect = hideTrumpSelect;
 window.enableFirstPlay = enableFirstPlay;
+console.log('[script.js] global fonksiyonlar expose edildi', {
+  hasRenderPlayers: typeof window.renderPlayers === 'function',
+  hasRenderCenterCards: typeof window.renderCenterCards === 'function'
+})

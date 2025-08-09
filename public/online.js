@@ -671,19 +671,13 @@ function connectToServer() {
                 });
                 
                 // Sırayı ihale kazanan oyuncuya geçir
-                const currentPlayer = data.currentPlayer !== undefined ? data.currentPlayer : (data.winner !== undefined ? data.winner : 0);
-                
-                if (typeof window.currentPlayer !== 'undefined') {
-                    window.currentPlayer = currentPlayer;
-                }
-                if (typeof currentPlayer !== 'undefined') {
-                    currentPlayer = currentPlayer;
-                }
-                
-                // Global currentPlayer değişkenini de güncelle
-                if (typeof window.onlineCurrentPlayer !== 'undefined') {
-                    window.onlineCurrentPlayer = currentPlayer;
-                }
+                const currentPlayerFromServer = data.currentPlayer !== undefined ? data.currentPlayer : (data.winner !== undefined ? data.winner : 0);
+
+                if (typeof window.currentPlayer !== 'undefined') window.currentPlayer = currentPlayerFromServer;
+                // Yerel değişkeni (let) de güncelle
+                if (typeof onlineCurrentPlayer !== 'undefined') onlineCurrentPlayer = currentPlayerFromServer;
+                // Global yansımayı da güncelle
+                if (typeof window.onlineCurrentPlayer !== 'undefined') window.onlineCurrentPlayer = currentPlayerFromServer;
                 
                 window.endAuction();
                 
@@ -699,8 +693,8 @@ function connectToServer() {
                 
                 // Aktif oyuncuyu güncelle
                 if (window.renderPlayersWithClick) {
-                    console.log('Aktif oyuncu güncelleniyor:', currentPlayer);
-                    window.renderPlayersWithClick(currentPlayer);
+                    console.log('Aktif oyuncu güncelleniyor:', currentPlayerFromServer);
+                    window.renderPlayersWithClick(currentPlayerFromServer);
                 }
             }
         }
@@ -1031,16 +1025,33 @@ function handleNextPlayer(data) {
 // El bittiğinde
 function handleTrickEnded(data) {
     console.log('El bitti işleniyor:', data);
-    const winner = data.winner;
-    const winnerTeam = (winner % 2 === 0) ? 1 : 2;
-    
-    // El sonucunu göster
-    // speakText(`El kazananı: Oyuncu ${winner + 1}`);
-    
-    // Yeni eli başlat
-    // firstPlayerOfTrick = winner;
+    const winner = data && typeof data.winner === 'number' ? data.winner : null;
+    if (winner === null) return;
+
+    // Sesli bildirim (varsa)
+    try {
+        if (window.speakText) {
+            const winnerName = window.getPlayerName ? window.getPlayerName(winner) : `Oyuncu ${winner + 1}`
+            window.speakText(`El kazananı: ${winnerName}`)
+        }
+    } catch (_) {}
+
+    // Sırayı elin kazananına geçir
     onlineCurrentPlayer = winner;
-    // renderPlayersWithClick(currentPlayer);
+    if (typeof window.currentPlayer !== 'undefined') window.currentPlayer = winner
+    if (typeof window.onlineCurrentPlayer !== 'undefined') window.onlineCurrentPlayer = winner
+
+    // Masayı temizle ve merkezi yeniden çiz
+    if (Array.isArray(window.playedCards)) window.playedCards.length = 0
+    else window.playedCards = []
+    if (typeof window.renderCenterCards === 'function') window.renderCenterCards()
+
+    // Arayüzü aktif oyuncuya göre tazele
+    if (typeof window.renderPlayers === 'function' && window.playersGlobal) window.renderPlayers(window.playersGlobal)
+    if (typeof window.renderPlayersWithClick === 'function') window.renderPlayersWithClick(winner)
+
+    // Puan tablosunu güncelle (varsa)
+    if (typeof window.calculateAndShowScores === 'function') window.calculateAndShowScores()
 }
 
 // Teklif verildiğinde
@@ -1396,6 +1407,24 @@ window.dealCardsOnline = function() {
 }
 
 // Kartlar dağıtıldığında çağrılır
+// Yardımcı: script yükleyici (tek sefer)
+function loadScriptOnce(src, id, onload) {
+    if (document.getElementById(id)) {
+        if (typeof onload === 'function') onload()
+        return
+    }
+    const s = document.createElement('script')
+    const cacheBust = `v=${Date.now()}`
+    s.src = src.includes('?') ? `${src}&${cacheBust}` : `${src}?${cacheBust}`
+    s.id = id
+    s.onload = () => {
+        console.log(`[online.js] ${src} yüklendi`)
+        if (typeof onload === 'function') onload()
+    }
+    s.onerror = () => console.error(`[online.js] ${src} yüklenemedi`)
+    document.head.appendChild(s)
+}
+
 window.handleCardsDealt = function(data) {
     console.log('Kartlar dağıtıldı, oyun durumu güncelleniyor:', data);
     
@@ -1406,26 +1435,84 @@ window.handleCardsDealt = function(data) {
     
     // Kartları render et
     if (data.players) {
-        window.playersGlobal = data.players;
         
         // players verisini doğru formata dönüştür
         const playersForRender = data.players.map(player => player.cards || []);
+        // İsimler için tam oyuncu listesi, eller için sade matris tut
+        window.players = data.players;
+        window.playersGlobal = playersForRender;
         
-        // renderPlayers fonksiyonunu çağır
-        if (typeof window.renderPlayers === 'function') {
-            console.log('renderPlayers fonksiyonu çağrılıyor');
-            window.renderPlayers(playersForRender);
-        } else {
-            console.error('renderPlayers fonksiyonu bulunamadı');
+        const ensureFallbacks = () => {
+            if (typeof window.renderPlayers !== 'function') {
+                console.warn('[online.js] renderPlayers için fallback tanımlanıyor')
+                const suitClass = { '♥': 'hearts', '♦': 'diamonds', '♠': 'spades', '♣': 'clubs' }
+                const rankOrder = ['A','10','K','Q','J','9']
+                const suitOrder = ['♥','♠','♦','♣']
+                window.renderPlayers = function(hands) {
+                    for (let i = 0; i < 4; i++) {
+                        const cardsDiv = document.querySelector(`#player${i+1} .cards`)
+                        if (!cardsDiv) continue
+                        cardsDiv.innerHTML = ''
+                        const hand = (hands && Array.isArray(hands[i])) ? hands[i] : []
+                        for (const suit of suitOrder) {
+                            const rowDiv = document.createElement('div')
+                            rowDiv.style.marginBottom = '2px'
+                            const suitCards = hand
+                                .filter(c => c && c.suit === suit)
+                                .sort((a,b) => rankOrder.indexOf(a.rank) - rankOrder.indexOf(b.rank))
+                            suitCards.forEach(card => {
+                                const cardDiv = document.createElement('span')
+                                cardDiv.className = 'card ' + (suitClass[card.suit] || '')
+                                cardDiv.textContent = `${card.rank}${card.suit}`
+                                rowDiv.appendChild(cardDiv)
+                            })
+                            cardsDiv.appendChild(rowDiv)
+                        }
+                    }
+                }
+            }
+            if (typeof window.renderCenterCards !== 'function') {
+                console.warn('[online.js] renderCenterCards için fallback tanımlanıyor')
+                const suitClass = { '♥': 'hearts', '♦': 'diamonds', '♠': 'spades', '♣': 'clubs' }
+                window.renderCenterCards = function() {
+                    const centerDiv = document.getElementById('center-cards')
+                    if (!centerDiv) return
+                    centerDiv.innerHTML = ''
+                    const played = (window.playedCards && Array.isArray(window.playedCards)) ? window.playedCards : []
+                    played.forEach(play => {
+                        if (!play?.card) return
+                        const cardDiv = document.createElement('span')
+                        cardDiv.className = 'card ' + (suitClass[play.card.suit] || '')
+                        cardDiv.textContent = `${play.card.rank}${play.card.suit}`
+                        cardDiv.title = `Oyuncu ${play.player + 1}`
+                        centerDiv.appendChild(cardDiv)
+                    })
+                }
+            }
         }
-        
-        // renderCenterCards fonksiyonunu çağır
-        if (typeof window.renderCenterCards === 'function') {
-            console.log('renderCenterCards fonksiyonu çağrılıyor');
-            window.renderCenterCards();
-        } else {
-            console.error('renderCenterCards fonksiyonu bulunamadı');
+
+        const doRender = () => {
+            ensureFallbacks()
+            if (typeof window.renderPlayers === 'function') {
+                console.log('renderPlayers fonksiyonu çağrılıyor')
+                window.renderPlayers(playersForRender)
+            } else {
+                console.error('renderPlayers fonksiyonu bulunamadı (fallback başarısız)')
+            }
+
+            if (typeof window.renderCenterCards === 'function') {
+                console.log('renderCenterCards fonksiyonu çağrılıyor')
+                window.renderCenterCards()
+            } else {
+                console.error('renderCenterCards fonksiyonu bulunamadı (fallback başarısız)')
+            }
         }
+
+        // Fonksiyonlar yoksa script.js'i dinamik yükle ve sonra render et
+        if (typeof window.renderPlayers !== 'function' || typeof window.renderCenterCards !== 'function') {
+            console.warn('Render fonksiyonları bulunamadı, script.js dinamik yükleniyor...')
+            loadScriptOnce('/script.js', 'script-js-dynamic', doRender)
+        } else doRender()
     }
     
     // Oyuncu isimlerini güncelle

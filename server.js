@@ -46,8 +46,11 @@ app.get('/api/rooms', (req, res) => {
     res.json({ rooms: roomList });
 });
 
-// Build klasöründen statik dosyaları servis et
-app.use(express.static(path.join(__dirname, 'build')));
+// Statik dosyaları servis et (CSS, JS, resimler vb.)
+app.use('/style.css', express.static(path.join(__dirname, 'build', 'style.css')));
+app.use('/online.js', express.static(path.join(__dirname, 'build', 'online.js')));
+app.use('/script.js', express.static(path.join(__dirname, 'build', 'script.js')));
+app.use('/bot.js', express.static(path.join(__dirname, 'build', 'bot.js')));
 
 // Ana sayfa route'u - online.html'i döndür
 app.get('/', (req, res) => {
@@ -306,7 +309,9 @@ io.on('connection', (socket) => {
             currentPlayer: (room.currentDealer + 1) % 4, // İlk teklifçi
             auctionCurrent: (room.currentDealer + 1) % 4,
             auctionHighestBid: 150,
-            auctionWinner: null
+            auctionWinner: null,
+            auctionTurns: 0,
+            lastBidderId: null
         };
 
         // Tüm oyunculara oyun başladığını bildir
@@ -380,7 +385,8 @@ io.on('connection', (socket) => {
         } else {
             // Teklif ver
             console.log(`Oyuncu ${playerId + 1} teklif veriyor: ${bid}`);
-            room.auctionHighestBid = bid;
+            room.gameState.auctionHighestBid = bid;
+            room.gameState.lastBidderId = playerId;
             io.to(roomId).emit('bidMade', { 
                 playerId, 
                 bid,
@@ -403,6 +409,30 @@ io.on('connection', (socket) => {
                 room.gameState.auctionCurrent = (room.gameState.auctionCurrent + 1) % 4;
             }
             
+            // Tur sayacı: 4 teklif/pas sonrası ihale biter
+            room.gameState.auctionTurns = (room.gameState.auctionTurns || 0) + 1;
+
+            // 4 adım tamamlandıysa en yüksek teklif veren kazanır
+            if (room.gameState.auctionTurns >= 4) {
+                // Basit kural: Herhangi bir yükseltme olduysa son yükselten kazanır, yoksa 4. oyuncu 150
+                if (room.gameState.auctionHighestBid && room.gameState.auctionHighestBid > 150 && room.gameState.lastBidderId !== null) {
+                    room.gameState.auctionWinner = room.gameState.lastBidderId;
+                } else {
+                    // Kimse yükseltmediyse 4. oyuncuya 150 kalsın
+                    room.gameState.auctionWinner = fourthPlayer;
+                    room.gameState.auctionHighestBid = 150;
+                }
+                room.gameState.auctionActive = false;
+                console.log(`İhale bitti. Kazanan: ${room.gameState.auctionWinner}, Teklif: ${room.gameState.auctionHighestBid}`);
+                io.to(roomId).emit('auctionEnded', {
+                    winner: room.gameState.auctionWinner,
+                    winningBid: room.gameState.auctionHighestBid,
+                    playerName: room.players[room.gameState.auctionWinner]?.name || `Oyuncu ${room.gameState.auctionWinner + 1}`,
+                    currentPlayer: room.gameState.auctionWinner
+                });
+                return;
+            }
+
             console.log(`Sıradaki teklifçi: ${room.gameState.auctionCurrent}`);
             io.to(roomId).emit('nextBidder', { currentBidder: room.gameState.auctionCurrent });
         }
@@ -533,7 +563,7 @@ io.on('connection', (socket) => {
             playerName: room.players[playerId]?.name || `Oyuncu ${playerId + 1}`
         });
         
-        // Eğer ihale aktifse, özel mantık kontrol et
+        // Eğer ihale aktifse, özel mantık + tur sayacı kontrol et
         if (room.gameState && room.gameState.auctionActive) {
             const dealer = room.gameState.currentDealer;
             const thirdPlayer = (dealer + 3) % 4;
@@ -584,9 +614,28 @@ io.on('connection', (socket) => {
                 return;
             }
             
-            // Normal pas - sırayı ilerlet
+            // Normal pas - sırayı ilerlet ve tur say
             console.log(`Oyuncu ${playerId + 1} pas geçti, sıra ilerliyor`);
             room.gameState.auctionCurrent = (room.gameState.auctionCurrent + 1) % 4;
+            room.gameState.auctionTurns = (room.gameState.auctionTurns || 0) + 1;
+
+            // 4 adım tamamlandıysa ihale biter
+            if (room.gameState.auctionTurns >= 4) {
+                if (room.gameState.auctionHighestBid && room.gameState.auctionHighestBid > 150 && room.gameState.lastBidderId !== null) {
+                    room.gameState.auctionWinner = room.gameState.lastBidderId;
+                } else {
+                    room.gameState.auctionWinner = fourthPlayer;
+                    room.gameState.auctionHighestBid = 150;
+                }
+                room.gameState.auctionActive = false;
+                io.to(roomId).emit('auctionEnded', {
+                    winner: room.gameState.auctionWinner,
+                    winningBid: room.gameState.auctionHighestBid,
+                    playerName: room.players[room.gameState.auctionWinner]?.name || `Oyuncu ${room.gameState.auctionWinner + 1}`,
+                    currentPlayer: room.gameState.auctionWinner
+                });
+                return;
+            }
             
             // Tüm oyunculara sıra değişikliğini bildir
             io.to(roomId).emit('nextBidder', { 
@@ -654,12 +703,18 @@ io.on('connection', (socket) => {
 
         // Yeni deste oluştur ve karıştır
         const deck = createAndShuffleDeck();
-        const players = dealCards(deck);
+        const dealtCards = dealCards(deck);
+        
+        // Oyunculara kartları ata
+        const playersWithCards = room.players.map((player, index) => ({
+            ...player,
+            cards: dealtCards[index] || []
+        }));
         
         // Oyun durumunu güncelle
         room.gameState = {
-            players: players,
-            currentDealer: room.currentDealer,
+            players: playersWithCards,
+            currentDealer: room.currentDealer || 0,
             auctionActive: true, // İhale aktif olmalı
             trumpSuit: null,
             playedCards: [],
@@ -667,6 +722,7 @@ io.on('connection', (socket) => {
             auctionCurrent: (room.currentDealer + 1) % 4,
             auctionHighestBid: 150,
             auctionWinner: null,
+            auctionTurns: 0,
             consecutiveBozCount: 0,
             sordumKonusMode: false,
             sordumPlayer: null,
@@ -675,7 +731,7 @@ io.on('connection', (socket) => {
 
         // Tüm oyunculara kartları dağıtıldı mesajı gönder
         io.to(roomId).emit('cardsDealt', {
-            players: players,
+            players: playersWithCards,
             gameState: room.gameState,
             auctionState: {
                 auctionActive: true, // İhale aktif olmalı
@@ -684,7 +740,7 @@ io.on('connection', (socket) => {
             }
         });
 
-        console.log(`Kartlar dağıtıldı - Oda: ${roomId}`);
+        console.log(`Kartlar dağıtıldı - Oda: ${roomId}, Dağıtıcı: ${room.currentDealer}`);
     });
 });
 

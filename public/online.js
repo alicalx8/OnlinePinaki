@@ -898,6 +898,7 @@ function startOnlineGame(data) {
     window.isSpectator = false;
     window.isOnlineMode = true;
     window.players = players;
+    window.currentDealer = data.gameState.currentDealer || 0; // Dağıtıcıyı ayarla
     
     // Arayüzü güncelle
     document.getElementById('lobby-section').style.display = 'none';
@@ -975,6 +976,9 @@ function syncGameState(gameState) {
         window.trumpSuit = gameState.trumpSuit;
         window.playedCards = gameState.playedCards || [];
         
+        // Dağıtıcıyı güncelle
+        window.currentDealer = gameState.currentDealer || 0;
+        
         // İhale durumunu güncelle
         if (typeof auctionActive !== 'undefined') {
             auctionActive = gameState.auctionActive;
@@ -987,6 +991,9 @@ function syncGameState(gameState) {
         if (window.renderPlayersWithClick) {
             window.renderPlayersWithClick(onlineCurrentPlayer);
         }
+        
+        // Oyuncu isimlerini güncelle
+        updatePlayerNames();
     }
 }
 
@@ -1304,6 +1311,30 @@ function setupEventListeners() {
         console.log('Debug butonu event listener eklendi');
     }
     
+    // Kartları dağıt butonu
+    const dealBtn = document.getElementById('dealBtn');
+    console.log('dealBtn elementi:', dealBtn);
+    if (dealBtn) {
+        dealBtn.addEventListener('click', () => {
+            console.log('Kartları dağıt butonuna tıklandı');
+            if (isOnlineMode && socket) {
+                console.log('Online modda kart dağıtma mesajı gönderiliyor');
+                if (window.dealCardsOnline) {
+                    window.dealCardsOnline();
+                } else {
+                    console.error('dealCardsOnline fonksiyonu bulunamadı!');
+                    socket.emit('dealCards', { roomId: currentRoom });
+                }
+            } else {
+                console.error('Online mod veya socket yok!');
+                alert('Online mod aktif değil veya sunucu bağlantısı yok!');
+            }
+        });
+        console.log('Kartları dağıt butonu event listener eklendi');
+    } else {
+        console.error('Kartları dağıt butonu bulunamadı!');
+    }
+    
     console.log('Tüm event listener\'lar başarıyla eklendi');
 }
 
@@ -1376,9 +1407,29 @@ window.handleCardsDealt = function(data) {
     // Kartları render et
     if (data.players) {
         window.playersGlobal = data.players;
-        renderPlayers(data.players);
-        renderCenterCards();
+        
+        // players verisini doğru formata dönüştür
+        const playersForRender = data.players.map(player => player.cards || []);
+        
+        // renderPlayers fonksiyonunu çağır
+        if (typeof window.renderPlayers === 'function') {
+            console.log('renderPlayers fonksiyonu çağrılıyor');
+            window.renderPlayers(playersForRender);
+        } else {
+            console.error('renderPlayers fonksiyonu bulunamadı');
+        }
+        
+        // renderCenterCards fonksiyonunu çağır
+        if (typeof window.renderCenterCards === 'function') {
+            console.log('renderCenterCards fonksiyonu çağrılıyor');
+            window.renderCenterCards();
+        } else {
+            console.error('renderCenterCards fonksiyonu bulunamadı');
+        }
     }
+    
+    // Oyuncu isimlerini güncelle
+    updatePlayerNames();
     
     // İhaleyi başlat
     if (data.auctionState) {

@@ -57,9 +57,28 @@ function sortPlayerCards(cards) {
 }
 
 function renderPlayers(players) {
+    console.log('renderPlayers çağrıldı:', players);
+    
+    if (!players || !Array.isArray(players)) {
+        console.error('renderPlayers: players parametresi geçersiz:', players);
+        return;
+    }
+    
     for (let i = 0; i < 4; i++) {
         const cardsDiv = document.querySelector(`#player${i+1} .cards`);
+        if (!cardsDiv) {
+            console.error(`renderPlayers: #player${i+1} .cards elementi bulunamadı`);
+            continue;
+        }
+        
         cardsDiv.innerHTML = '';
+        
+        // players[i] undefined kontrolü
+        if (!players[i] || !Array.isArray(players[i])) {
+            console.warn(`renderPlayers: Oyuncu ${i} için kart verisi bulunamadı:`, players[i]);
+            continue;
+        }
+        
         // Her suit için bir satır
         for (const suit of suitOrder) {
             const rowDiv = document.createElement('div');
@@ -708,13 +727,24 @@ function getPlayerName(playerIndex) {
 
 function renderCenterCards() {
     const centerDiv = document.getElementById('center-cards');
+    if (!centerDiv) {
+        console.error('renderCenterCards: #center-cards elementi bulunamadı');
+        return;
+    }
+    
     centerDiv.innerHTML = '';
+    
+    // window.playedCards kullan, eğer yoksa boş array kullan
+    const playedCards = window.playedCards || [];
+    
     playedCards.forEach(play => {
-        const cardDiv = document.createElement('span');
-        cardDiv.className = 'card ' + suitClass[play.card.suit];
-        cardDiv.textContent = play.card.rank + play.card.suit;
-        cardDiv.title = `Oyuncu ${play.player + 1}`;
-        centerDiv.appendChild(cardDiv);
+        if (play && play.card) {
+            const cardDiv = document.createElement('span');
+            cardDiv.className = 'card ' + suitClass[play.card.suit];
+            cardDiv.textContent = play.card.rank + play.card.suit;
+            cardDiv.title = `Oyuncu ${play.player + 1}`;
+            centerDiv.appendChild(cardDiv);
+        }
     });
 }
 
@@ -1752,19 +1782,19 @@ window.onload = function() {
         }
     });
 
-    // Global fonksiyonları window objesine ekle
-    window.renderCenterCards = renderCenterCards;
-    window.renderPlayersWithClick = renderPlayersWithClick;
-    window.getPlayerName = getPlayerName;
-    window.addPotaMessage = addPotaMessage;
-    window.startAuction = startAuction;
-    window.renderPlayers = renderPlayers;
-    window.calculateAndShowScores = calculateAndShowScores;
-    window.speakText = speakText;
-    window.nextAuctionTurn = nextAuctionTurn;
-    window.endAuction = endAuction;
-    window.showTrumpSelect = showTrumpSelect;
-    window.hideTrumpSelect = hideTrumpSelect;
-    window.enableFirstPlay = enableFirstPlay;
-
 };
+
+// Global fonksiyonları window objesine ekle (her zaman erişilebilir olmalı)
+window.renderCenterCards = renderCenterCards;
+window.renderPlayersWithClick = renderPlayersWithClick;
+window.getPlayerName = getPlayerName;
+window.addPotaMessage = addPotaMessage;
+window.startAuction = startAuction;
+window.renderPlayers = renderPlayers;
+window.calculateAndShowScores = calculateAndShowScores;
+window.speakText = speakText;
+window.nextAuctionTurn = nextAuctionTurn;
+window.endAuction = endAuction;
+window.showTrumpSelect = showTrumpSelect;
+window.hideTrumpSelect = hideTrumpSelect;
+window.enableFirstPlay = enableFirstPlay;

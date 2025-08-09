@@ -319,14 +319,7 @@ function endAuction() {
         const winnerName = getPlayerName(auctionWinner);
         document.getElementById('auction-status').innerHTML = `İhaleyi ${winnerName} kazandı!<br>Teklif: ${auctionHighestBid}`;
         
-        // İhale sonucu mesajını ekle
-        const message = `İhaleyi ${winnerName} kazandı! Teklif: ${auctionHighestBid}`;
-        if (window.addPotaMessage) {
-            window.addPotaMessage(message, 'Sistem');
-        }
-        
-        // İhale sonucunu sesli okuma
-        speakText(`İhaleyi ${winnerName} kazandı. Teklif: ${auctionHighestBid}`);
+        // Not: İstek üzerine ihale sonucunu pota kutusuna yazmıyoruz ve sesli okumuyoruz
         //calculateAndShowScores(); // Başlangıç puanlarını gösterme
         showTrumpSelect();
         // Burada koz seçimi ve ilk kart atımı başlatılabilir
@@ -524,7 +517,13 @@ function renderPlayersWithClick(activePlayer) {
                         cardDiv.style.opacity = 0.7;
                         cardDiv.title = 'Bot oyuncu - otomatik oynar';
                     } else {
-                        // İnsan oyuncu için tıklanabilirlik ver
+        // İnsan oyuncu için tıklanabilirlik ver
+        // Koz seçilmeden hiç kimse kart atamaz
+        if (!window.trumpSuit) {
+            cardDiv.style.opacity = 0.6;
+            cardDiv.title = 'Önce koz seçilmeli';
+            cardDiv.style.cursor = 'not-allowed';
+        } else {
                         let canPlay = true;
                         if (leadSuit && allowedCards) {
                             canPlay = allowedCards.some(c => c && c.suit === card.suit && c.rank === card.rank);
@@ -548,6 +547,7 @@ function renderPlayersWithClick(activePlayer) {
                             cardDiv.style.opacity = 0.5;
                             cardDiv.title = 'Bu kartı oynayamazsın';
                         }
+        }
                     }
                 } else {
                     // Pasif oyuncular için tıklanabilirlik verme
@@ -647,7 +647,6 @@ function botPlayCard(playerIdx) {
     if (!window.botManager || !window.botManager.isBotActive(playerIdx)) return;
     
     console.log(`Bot ${playerIdx + 1} kart oynuyor...`);
-    speakText(`Bot ${playerIdx + 1} kart oynuyor`);
     
     const hand = playersGlobal[playerIdx];
     const leadSuit = playedCards.length > 0 ? playedCards[0].card.suit : null;
@@ -678,14 +677,12 @@ function botMakeBid(playerIdx) {
         auctionTurns++;
         auctionHighestBid = bid;
         updateAuctionHighestBid();
-        speakText(`Bot ${playerIdx + 1} teklif verdi: ${bid}`);
         
         // Sıradaki oyuncuya geç
         auctionCurrent = (auctionCurrent + 1) % 4;
         nextAuctionTurn();
     } else {
         // Pas geç
-        speakText(`Bot ${playerIdx + 1} pas`);
         auctionPasses[playerIdx] = true;
         auctionTurns++;
         
@@ -858,8 +855,8 @@ function calculateAndShowScores() {
     const player3Name = getPlayerName(2);
     const player2Name = getPlayerName(1);
     const player4Name = getPlayerName(3);
-    html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 1 (${player1Name} & ${player3Name})</td><td style="padding:4px;border:1px solid #ddd;">${team1}</td></tr>`;
-    html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 2 (${player2Name} & ${player4Name})</td><td style="padding:4px;border:1px solid #ddd;">${team2}</td></tr>`;
+    html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 1</td><td style="padding:4px;border:1px solid #ddd;">${team1}</td></tr>`;
+    html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 2</td><td style="padding:4px;border:1px solid #ddd;">${team2}</td></tr>`;
     html += '</table>';
     tableDiv.innerHTML = html;
     tableDiv.style.display = '';
@@ -925,7 +922,7 @@ Array.from(document.getElementsByClassName('trump-btn')).forEach(btn => {
             });
         } else {
             // Offline modda yerel işle
-            speakText(`Seçilen koz: ${kozAd}`);
+            // Not: İstek üzerine sesli okuma devre dışı
             hideTrumpSelect();
             document.getElementById('auction-status').innerHTML += `<br>Koz: ${trumpSuit}`;
             // Koz seçildikten sonra ilk kart atımı başlasın
@@ -939,7 +936,7 @@ Array.from(document.getElementsByClassName('trump-btn')).forEach(btn => {
 function botDealCards() {
     if (!window.botManager || !window.botManager.isBotActive(window.currentDealer)) return;
     
-    speakText(`Bot ${window.currentDealer + 1} kartları dağıtıyor`);
+    // Not: İstek üzerine sesli okuma devre dışı
     
     // Kart dağıt butonuna programatik olarak tıkla
     const dealBtn = document.getElementById('dealBtn');
@@ -966,7 +963,7 @@ function botSelectTrump(playerIdx) {
             case '♣': kozAd = 'Sinek'; break;
             default: kozAd = trumpSuit;
         }
-        speakText(`Bot ${playerIdx + 1} koz seçti: ${kozAd}`);
+        // Not: İstek üzerine sesli okuma devre dışı
         hideTrumpSelect();
         document.getElementById('auction-status').innerHTML += `<br>Koz: ${trumpSuit}`;
         // Koz seçildikten sonra ilk kart atımı başlasın
@@ -1019,7 +1016,7 @@ function setupBidButton() {
             auctionTurns++;
             auctionHighestBid = bid;
             updateAuctionHighestBid();
-            speakText(`Oyuncu ${auctionCurrent + 1} teklif verdi: ${bid}`);
+            // Not: İstek üzerine sesli okuma devre dışı
 
             // Sordum/Konuş sonrası 3. oyuncu teklif verirse sadece sırayı 4. oyuncuya geçir
             const dealer = window.currentDealer;
@@ -1038,7 +1035,7 @@ function setupBidButton() {
                 sordumPlayer = null;
                 auctionWinner = fourthPlayer;
                 const player4Name = getPlayerName(fourthPlayer);
-                speakText(`İhale ${player4Name}'e kaldı. Teklif: ${auctionHighestBid}`);
+                // Not: İstek üzerine sesli okuma devre dışı
                 endAuction();
                 return;
             }
@@ -1073,7 +1070,7 @@ document.getElementById('pass-btn').addEventListener('click', () => {
         console.log('Pas mesajı sunucuya gönderildi');
     } else {
         // Offline modda yerel işle
-        speakText(`Oyuncu ${auctionCurrent + 1} pas`);
+            // Not: İstek üzerine sesli okuma devre dışı
         auctionPasses[auctionCurrent] = true;
         auctionTurns++;
 
@@ -1087,7 +1084,7 @@ document.getElementById('pass-btn').addEventListener('click', () => {
             auctionHighestBid = 150;
             auctionWinner = fourthPlayer;
             const player4Name = getPlayerName(fourthPlayer);
-            speakText(`İhale ${player4Name}'e 150'ye kaldı`);
+            // Not: İstek üzerine sesli okuma devre dışı
             updateAuctionHighestBid();
             sordumKonusMode = false;
             endAuction();
@@ -1098,7 +1095,7 @@ document.getElementById('pass-btn').addEventListener('click', () => {
             auctionWinner = thirdPlayer;
             auctionHighestBid = auctionBids[thirdPlayer];
             const player3Name = getPlayerName(thirdPlayer);
-            speakText(`İhale ${player3Name}'e kaldı. Teklif: ${auctionHighestBid}`);
+            // Not: İstek üzerine sesli okuma devre dışı
             sordumKonusMode = false;
             konusPlayer = null;
             sordumPlayer = null;
@@ -1149,7 +1146,7 @@ document.getElementById('sordum-btn').addEventListener('click', () => {
             return;
         }
         
-        speakText(`Oyuncu ${auctionCurrent + 1} sordum dedi`);
+        // Not: İstek üzerine sesli okuma devre dışı
         sordumKonusMode = true;
         sordumPlayer = auctionCurrent;
         auctionTurns++;
@@ -1190,13 +1187,13 @@ document.getElementById('konus-btn').addEventListener('click', () => {
         
         if (auctionCurrent === thirdPlayer && !sordumKonusMode) {
             // 3. oyuncu direkt konuş diyor
-            speakText(`Oyuncu ${auctionCurrent + 1} konuş dedi`);
+            // Not: İstek üzerine sesli okuma devre dışı
             auctionTurns++;
             auctionCurrent = (auctionCurrent + 1) % 4;
             nextAuctionTurn();
         } else if (auctionCurrent === fourthPlayer && sordumKonusMode) {
             // 4. oyuncu 3. oyuncuya konuş diyor
-            speakText(`Oyuncu ${auctionCurrent + 1} konuş dedi`);
+            // Not: İstek üzerine sesli okuma devre dışı
             konusPlayer = auctionCurrent;
             auctionCurrent = thirdPlayer; // Sıra 3. oyuncuya geri döner
             nextAuctionTurn();
@@ -1214,7 +1211,7 @@ document.getElementById('boz-btn').addEventListener('click', () => {
     
     if (auctionCurrent !== fourthPlayer) return;
     // Boz dendiğinde sesli okuma
-    speakText(`Oyuncu ${auctionCurrent + 1} boz dedi`);
+    // Not: İstek üzerine sesli okuma devre dışı
     
     // İhale durumunu sıfırla
     auctionActive = false;
@@ -1249,8 +1246,8 @@ document.getElementById('boz-btn').addEventListener('click', () => {
         const player3Name = getPlayerName(2);
         const player2Name = getPlayerName(1);
         const player4Name = getPlayerName(3);
-        html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 1 (${player1Name} & ${player3Name})</td><td style="padding:4px;border:1px solid #ddd;">0</td></tr>`;
-        html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 2 (${player2Name} & ${player4Name})</td><td style="padding:4px;border:1px solid #ddd;">0</td></tr>`;
+        html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 1</td><td style="padding:4px;border:1px solid #ddd;">0</td></tr>`;
+        html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 2</td><td style="padding:4px;border:1px solid #ddd;">0</td></tr>`;
         html += `<tr style='font-weight:bold;background:#ffd700;color:#222;'><td style="padding:4px;border:1px solid #ddd;">Birikimli Takım 1</td><td style="padding:4px;border:1px solid #ddd;">${cumulativeTeam1Score}</td></tr>`;
         html += `<tr style='font-weight:bold;background:#ffd700;color:#222;'><td style="padding:4px;border:1px solid #ddd;">Birikimli Takım 2</td><td style="padding:4px;border:1px solid #ddd;">${cumulativeTeam2Score}</td></tr>`;
         html += '</table>';
@@ -1315,7 +1312,7 @@ function setupDealButton() {
             // Sadece dağıtma sırası gelen oyuncu kartları dağıtabilir
             if (window.currentPlayer && window.currentPlayer !== window.currentDealer) {
                 const dealerName = window.getPlayerName(window.currentDealer);
-                speakText(`Sadece ${dealerName} kartları dağıtabilir`);
+                // Not: İstek üzerine sesli okuma devre dışı
                 return;
             }
             
@@ -1372,8 +1369,8 @@ function setupDealButton() {
                 const player3Name = getPlayerName(2);
                 const player2Name = getPlayerName(1);
                 const player4Name = getPlayerName(3);
-                html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 1 (${player1Name} & ${player3Name})</td><td style="padding:4px;border:1px solid #ddd;">0</td></tr>`;
-                html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 2 (${player2Name} & ${player4Name})</td><td style="padding:4px;border:1px solid #ddd;">0</td></tr>`;
+                html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 1</td><td style="padding:4px;border:1px solid #ddd;">0</td></tr>`;
+                html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 2</td><td style="padding:4px;border:1px solid #ddd;">0</td></tr>`;
                 html += `<tr style='font-weight:bold;background:#ffd700;color:#222;'><td style="padding:4px;border:1px solid #ddd;">Birikimli Takım 1</td><td style="padding:4px;border:1px solid #ddd;">${cumulativeTeam1Score}</td></tr>`;
                 html += `<tr style='font-weight:bold;background:#ffd700;color:#222;'><td style="padding:4px;border:1px solid #ddd;">Birikimli Takım 2</td><td style="padding:4px;border:1px solid #ddd;">${cumulativeTeam2Score}</td></tr>`;
                 html += '</table>';
@@ -1512,8 +1509,8 @@ function calculateEndGameScores() {
     // Sonucu ekrana yaz
     const resultDiv = document.getElementById('endgame-result');
     resultDiv.innerHTML = `Oyun Sonu Sonuçları:<br>
-    Takım 1 (1 & 3): <b>${t1}</b> puan<br>
-    Takım 2 (2 & 4): <b>${t2}</b> puan<br>
+    Takım 1: <b>${t1}</b> puan<br>
+    Takım 2: <b>${t2}</b> puan<br>
     1. Takımın Toplam Puanı: <b>${team1Start} + ${t1} = ${team1Total}</b><br>
     2. Takımın Toplam Puanı: <b>${team2Start} + ${t2} = ${team2Total}</b><br>
     <br><strong>Birikimli Puanlar:</strong><br>
@@ -1560,8 +1557,8 @@ function calculateEndGameScores() {
         for (let i = 0; i < 4; i++) {
             html += `<tr><td style="padding:4px;border:1px solid #ddd;">Oyuncu ${i+1}</td><td style="padding:4px;border:1px solid #ddd;">0</td></tr>`;
         }
-        html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 1 (1 & 3)</td><td style="padding:4px;border:1px solid #ddd;">0</td></tr>`;
-        html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 2 (2 & 4)</td><td style="padding:4px;border:1px solid #ddd;">0</td></tr>`;
+        html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 1</td><td style="padding:4px;border:1px solid #ddd;">0</td></tr>`;
+        html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 2</td><td style="padding:4px;border:1px solid #ddd;">0</td></tr>`;
         html += '</table>';
         tableDiv.innerHTML = html;
     }
@@ -1754,14 +1751,14 @@ window.onload = function() {
                         playerName = currentPlayer.name;
                     }
                 }
-                window.speakText(`${playerName}: ${text}`);
+                // Not: İstek üzerine sesli okuma devre dışı
             }
         } else {
             console.log('Offline modda pota mesajı işleniyor');
             
             // Offline modda yerel işle
             addPotaMessage(text, playerNum);
-            speakText(`Oyuncu ${playerNum}: ${text}`);
+            // Not: İstek üzerine sesli okuma devre dışı
             
             // Koz belirlenmeden önce oyun akışını etkilesin, belirlendikten sonra sadece sohbet olsun
             if (trumpSuit === null) {

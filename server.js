@@ -331,6 +331,12 @@ io.on('connection', (socket) => {
         
         if (!room || !room.gameState) return;
 
+        // Koz seçilmeden kart oynanamaz (online kuralı)
+        if (!room.gameState.trumpSuit) {
+            console.log(`Oda ${roomId}: Koz seçilmeden kart oynama reddedildi (oyuncu ${playerId + 1})`);
+            return;
+        }
+
         // Kartı oyna
         room.gameState.playedCards.push({ player: playerId, card });
         

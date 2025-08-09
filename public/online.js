@@ -1029,12 +1029,7 @@ function handleTrickEnded(data) {
     if (winner === null) return;
 
     // Sesli bildirim (varsa)
-    try {
-        if (window.speakText) {
-            const winnerName = window.getPlayerName ? window.getPlayerName(winner) : `Oyuncu ${winner + 1}`
-            window.speakText(`El kazananı: ${winnerName}`)
-        }
-    } catch (_) {}
+    // Not: İstek üzerine el kazananını sesli söylemiyoruz
 
     // Sırayı elin kazananına geçir
     onlineCurrentPlayer = winner;
@@ -1052,6 +1047,16 @@ function handleTrickEnded(data) {
 
     // Puan tablosunu güncelle (varsa)
     if (typeof window.calculateAndShowScores === 'function') window.calculateAndShowScores()
+
+    // Oyun bitti mi? Tüm eller boşsa final skoru göster
+    try {
+        if (Array.isArray(window.playersGlobal)) {
+            const allEmpty = window.playersGlobal.every(hand => Array.isArray(hand) && hand.length === 0)
+            if (allEmpty && typeof window.calculateEndGameScores === 'function') {
+                window.calculateEndGameScores()
+            }
+        }
+    } catch (_) {}
 }
 
 // Teklif verildiğinde
@@ -1559,17 +1564,7 @@ function handleCardPlayed(data) {
             window.renderPlayers(window.playersGlobal);
         }
         
-        // Mesaj kutusuna ekle (seyirci modunda da çalışsın)
-        const playerName = window.getPlayerName ? window.getPlayerName(data.playerId) : `Oyuncu ${data.playerId + 1}`;
-        const message = `${playerName} ${data.card.rank}${data.card.suit} oynadı`;
-        if (window.addPotaMessage) {
-            window.addPotaMessage(message, data.playerId + 1);
-        }
-        
-        // Sesli okuma
-        if (window.speakText) {
-            window.speakText(message);
-        }
+        // Not: İstek üzerine oynanan kart mesajını pota kutusuna yazmıyoruz ve sesli okumuyoruz
     }
 }
 

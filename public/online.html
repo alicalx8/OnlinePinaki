@@ -58,11 +58,61 @@
             background: #666;
             cursor: not-allowed;
         }
+        /* Navbar */
+        .navbar {
+            position: fixed;
+            inset: 0 auto auto 0;
+            width: 100%;
+            z-index: 1002;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            background: rgba(0,0,0,0.95);
+            border-bottom: 1px solid rgba(255,255,255,0.12);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+        }
+        .nav-left, .nav-right { display: flex; align-items: center; gap: 10px; }
+        .nav-right { justify-content: flex-end; justify-self: end; }
+        .nav-center { text-align: center; font-weight: 800; font-size: 18px; letter-spacing: .3px; }
+        .navbar button {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: none;
+            background: #ffd700;
+            color: #222;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .dropdown { position: relative; }
+        .dropdown > summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 8px 10px;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.1);
+        }
+        .dropdown > summary::-webkit-details-marker { display: none; }
+        .dropdown[open] > summary { background: rgba(255,255,255,0.15); }
+        .dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            min-width: 280px;
+            background: rgba(20,20,20,0.98);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+        .dropdown-menu h3 { margin: 0 0 8px 0; font-size: 16px; }
+        .dropdown-menu p, .dropdown-menu li { font-size: 14px; line-height: 1.35; }
     </style>
 </head>
 <body>
-    <div class="lobby-container">
-        <h1>Pinaki Online</h1>
+        <div class="lobby-container">
         
         <div id="join-section">
             <h2>Odaya Katıl</h2>
@@ -84,18 +134,45 @@
             <button id="start-game-btn" class="start-game-btn" disabled>Oyunu Başlat (4 oyuncu gerekli)</button>
         </div>
 
-        <div id="game-section" style="display:none;">
-            <div id="left-panel">
-                <button id="dealBtn">Kartları Dağıt</button>
-                <div id="bot-controls" style="margin: 10px 0;">
-                    <h3>Bot Kontrolleri</h3>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button id="bot1-toggle" class="bot-btn" data-player="0">Oyuncu 1: İnsan</button>
-                        <button id="bot2-toggle" class="bot-btn" data-player="1">Oyuncu 2: İnsan</button>
-                        <button id="bot3-toggle" class="bot-btn" data-player="2">Oyuncu 3: İnsan</button>
-                        <button id="bot4-toggle" class="bot-btn" data-player="3">Oyuncu 4: İnsan</button>
-                    </div>
+        <div id="game-section" style="display:none; padding-top:60px;">
+            <!-- Top Navbar -->
+            <nav class="navbar">
+                <div class="nav-left">
+                    <button id="dealBtn">Kartları Dağıt</button>
+                    <details class="dropdown">
+                        <summary>Bot Kontrolleri</summary>
+                        <div class="dropdown-menu">
+                            <h3>Bot Kontrolleri</h3>
+                            <div id="bot-controls" style="margin: 10px 0;">
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    <button id="bot1-toggle" class="bot-btn" data-player="0">Oyuncu 1: İnsan</button>
+                                    <button id="bot2-toggle" class="bot-btn" data-player="1">Oyuncu 2: İnsan</button>
+                                    <button id="bot3-toggle" class="bot-btn" data-player="2">Oyuncu 3: İnsan</button>
+                                    <button id="bot4-toggle" class="bot-btn" data-player="3">Oyuncu 4: İnsan</button>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
                 </div>
+                <div class="nav-center">Pinaki Online</div>
+                <div class="nav-right">
+                    <details class="dropdown">
+                        <summary>Nasıl Oynanır</summary>
+                        <div class="dropdown-menu" style="max-width: 420px;">
+                            <h3>Nasıl Oynanır</h3>
+                            <ul style="margin:0;padding-left:18px;">
+                                <li>4 oyuncu, iki takım (1&3 ve 2&4).</li>
+                                <li>Kartlar dağıtılır, ihale sırasıyla yapılır.</li>
+                                <li>İhaleyi kazanan oyuncu koz rengini seçer.</li>
+                                <li>Sırası gelen oyuncu kurallara uygun kart atar.</li>
+                                <li>4 kart atılınca eli en yüksek kart alır ve yeni eli başlatır.</li>
+                                <li>Oyun sonu puanlar otomatik hesaplanır.</li>
+                            </ul>
+                        </div>
+                    </details>
+                </div>
+            </nav>
+            <div id="left-panel">
                 <div id="auction" style="margin: 15px 0;">
                     <h2>İhale Süreci</h2>
                     <div id="auction-status">Kartlar dağıtıldıktan sonra ihale başlayacak.</div>
@@ -122,7 +199,7 @@
             <div id="right-panel">
                 <div id="endgame-result" style="margin-top:0px;font-size:14px;font-weight:bold;color:#ffd700;"></div>
             </div>
-            <div id="players">
+            <div id="players" style="margin-top:-50px;">
                 <div class="player" id="player1"><h4 id="player1-name">Oyuncu 1</h4><div class="cards"></div></div>
                 <div class="player" id="player2"><h4 id="player2-name">Oyuncu 2</h4><div class="cards"></div></div>
                 <div class="player" id="player3"><h4 id="player3-name">Oyuncu 3</h4><div class="cards"></div></div>

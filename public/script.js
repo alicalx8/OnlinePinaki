@@ -1452,13 +1452,21 @@ function setupDealButton() {
                 if (window.onlineCurrentPlayer !== undefined && window.onlineCurrentPlayer !== null) {
                     realCurrentPlayer = window.onlineCurrentPlayer;
                     console.log('Online modda onlineCurrentPlayer kullanıldı:', realCurrentPlayer);
-                } else if (window.socket && window.players && Array.isArray(window.players)) {
+                } else if (window.socket && window.socket.id && window.players && Array.isArray(window.players)) {
                     // Socket ID ile oyuncu pozisyonunu bul
                     const currentPlayer = window.players.find(p => p.id === window.socket.id);
-                    if (currentPlayer) {
+                    if (currentPlayer && currentPlayer.position !== undefined) {
                         realCurrentPlayer = currentPlayer.position;
                         console.log('Online modda socket.id ile oyuncu pozisyonu bulundu:', realCurrentPlayer);
+                    } else {
+                        // Fallback: Socket ID'yi pozisyon olarak kullan
+                        realCurrentPlayer = 0; // Geçici olarak 0 ata
+                        console.log('Online modda fallback pozisyon kullanıldı:', realCurrentPlayer);
                     }
+                } else if (window.socket && window.socket.id) {
+                    // Socket var ama players yok - geçici pozisyon ata
+                    realCurrentPlayer = 0;
+                    console.log('Online modda geçici pozisyon atandı:', realCurrentPlayer);
                 }
             } else {
                 // Offline modda: Sabit olarak 0 (ilk oyuncu) veya window.currentPlayer

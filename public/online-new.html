@@ -138,10 +138,9 @@
         <div id="game-section" style="display:none; padding-top:60px;">
             <!-- Top Navbar -->
             <nav class="navbar">
-                            <div class="nav-left">
-                <button id="dealBtn">Kartları Dağıt</button>
-                <button id="restartBtn" style="margin-left: 10px; background: #e74c3c; color: white;">Oyunu Yeniden Başlat</button>
-                <details class="dropdown">
+                <div class="nav-left">
+                    <button id="dealBtn">Kartları Dağıt</button>
+                    <details class="dropdown">
                         <summary>Bot Kontrolleri</summary>
                         <div class="dropdown-menu">
                             <h3>Bot Kontrolleri</h3>
@@ -221,7 +220,35 @@
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="script.js?v=3"></script>
-    <script src="online.js?v=999&t=1703123456789"></script>
+    <script type="module">
+        import { 
+            startOnlineGame, 
+            handleCardPlayed, 
+            setupEventListeners,
+            connectToServer,
+            joinRoom,
+            joinAsSpectator,
+            startGame
+        } from `./online.js?v=15&r=${Math.random()}&t=${Date.now()}&cache=${Math.random()}`;
+        
+        // Test için fonksiyonları global scope'a ekle (sadece test amaçlı)
+        window.startOnlineGame = startOnlineGame;
+        window.handleCardPlayed = handleCardPlayed;
+        window.setupEventListeners = setupEventListeners;
+        
+        // Fonksiyonun güncel olup olmadığını test et
+        console.log('startOnlineGame fonksiyonu güncel mi:', startOnlineGame.toString().includes('=== startOnlineGame BAŞLADI ==='));
+        
+        // Event listener'ları kur
+        setupEventListeners();
+        
+        // WebSocket bağlantısını kur (eğer henüz kurulmamışsa)
+        if (!window.socket || !window.socket.connected) {
+            connectToServer();
+        }
+        
+        console.log('✅ online.js modülü başarıyla yüklendi ve hazır!');
+    </script>
     <script src="bot.js?v=3"></script>
 </body>
 </html> 

@@ -184,24 +184,27 @@ function startAuction() {
     document.getElementById('auction-status').innerHTML = `İhale başladı! (En az 150)`;
     document.getElementById('auction-controls').style.display = '';
     
-    // Tüm oyuncu kutularından parlaklık efektlerini kaldır
-    for (let i = 0; i < 4; i++) {
-        const playerDiv = document.getElementById(`player${i+1}`);
-        if (playerDiv) {
-            playerDiv.classList.remove('active-player', 'auction-active');
-        }
+    // Tüm oyuncu kutularından parlaklık efektlerini kaldır - renderPlayersWithClick kullan
+    if (window.renderPlayersWithClick) {
+        // Geçici olarak hiçbir oyuncuyu aktif gösterme
+        window.renderPlayersWithClick(null);
     }
     
     // updateDealButton() çağrısını kaldırdık - el tamamlanana kadar aynı dağıtıcı kalmalı
     nextAuctionTurn();
+    
+    // Offline modda da doğru ışık gösterilsin
+    if (window.renderPlayersWithClick && auctionCurrent !== undefined && auctionCurrent !== null) {
+        window.renderPlayersWithClick(auctionCurrent);
+    }
 }
 
 window.nextAuctionTurn = function() {
     // Sordum/Konuş modunda değilse normal ihale bitiş kontrolü yap
     if (!sordumKonusMode && auctionTurns >= 4) {
-        // İhale bittiğinde tüm kutulardan kaldır
-        for (let i = 0; i < 4; i++) {
-            document.getElementById(`player${i+1}`).classList.remove('auction-active');
+        // İhale bittiğinde tüm kutulardan kaldır - renderPlayersWithClick kullan
+        if (window.renderPlayersWithClick) {
+            window.renderPlayersWithClick(null);
         }
 
         endAuction();
@@ -212,11 +215,9 @@ window.nextAuctionTurn = function() {
     document.getElementById('auction-player').textContent = `${currentPlayerName} sırada: `;
     document.getElementById('bid-input').value = '';
     document.getElementById('bid-input').focus();
-    // Tüm kutulardan kaldır, sadece teklif sırası gelen oyuncuya ekle
-    for (let i = 0; i < 4; i++) {
-        const div = document.getElementById(`player${i+1}`);
-        if (i === auctionCurrent) div.classList.add('auction-active');
-        else div.classList.remove('auction-active');
+    // İhale sürecinde ışıkları güncelle - renderPlayersWithClick kullan
+    if (window.renderPlayersWithClick && auctionCurrent !== undefined && auctionCurrent !== null) {
+        window.renderPlayersWithClick(auctionCurrent);
     }
     
     // Eğer sıradaki oyuncu bot ise, otomatik teklif ver
@@ -295,6 +296,13 @@ function endAuction() {
     auctionActive = false;
     document.getElementById('auction-controls').style.display = 'none';
     updateAuctionHighestBid();
+    
+    // İhale bittiğinde tüm sarı ışıkları (auction-active) kapat - renderPlayersWithClick kullan
+    if (window.renderPlayersWithClick) {
+        // Geçici olarak hiçbir oyuncuyu aktif gösterme
+        window.renderPlayersWithClick(null);
+    }
+    
     // Online modda winner ve bid sunucudan gelir; yerel hesaplama ile üzerine yazmayalım
     if (window.isOnlineMode) {
         // Sunucudan set edilmiş değerleri koru, sadece UI kapat
@@ -392,7 +400,7 @@ function enableFirstPlay() {
     firstPlayerOfTrick = winner;
     window.currentPlayer = winner;
     
-    if (window.renderPlayersWithClick) {
+    if (window.renderPlayersWithClick && window.currentPlayer !== undefined && window.currentPlayer !== null) {
         window.renderPlayersWithClick(window.currentPlayer);
     }
     // Eğer ilk kartı atacak oyuncu bot ise otomatik oynat
@@ -404,12 +412,76 @@ function enableFirstPlay() {
 }
 
 function renderPlayersWithClick(activePlayer) {
-    console.log('renderPlayersWithClick çağrıldı:', { activePlayer, playersGlobal: window.playersGlobal });
+    console.log('renderPlayersWithClick çağrıldı:', { 
+        activePlayer, 
+        playersGlobal: window.playersGlobal,
+        auctionActive: window.auctionActive,
+        auctionCurrent: window.auctionCurrent,
+        currentPlayer: window.currentPlayer
+    });
     
     // playersGlobal tanımlı değilse çık
-    if (!window.playersGlobal) {
-        console.error('playersGlobal tanımlı değil');
+    if (!window.playersGlobal || window.playersGlobal.length === 0) {
+        console.warn('renderPlayersWithClick: playersGlobal tanımlı değil veya boş.');
         return;
+    }
+    
+    // Geçersiz activePlayer değeri kontrolü (null değerine izin ver)
+    if (activePlayer !== null && (activePlayer === undefined || activePlayer < 0 || activePlayer > 3)) {
+        console.warn('renderPlayersWithClick: Geçersiz activePlayer değeri:', activePlayer);
+        return;
+    }
+    
+    // Önce tüm ışıkları temizle - bu çok önemli!
+    for (let i = 0; i < 4; i++) {
+        const playerDiv = document.getElementById(`player${i+1}`);
+        if (playerDiv) {
+            playerDiv.classList.remove('active-player', 'auction-active');
+            console.log(`Oyuncu ${i+1} ışıkları temizlendi`);
+        }
+    }
+    
+    // Sadece bir ışık yanmalı - öncelik sırası:
+    // 1. İhale sürecinde: auctionCurrent sarı ışık (sadece gerçek ihale sürecinde)
+    // 2. Kart atma sırasında: currentPlayer mavi ışık
+    // 3. Hiçbiri aktif değilse: hiçbir ışık yanmaz
+    
+    // activePlayer null ise tüm ışıkları kapat
+    if (activePlayer === null) {
+        console.log('Tüm ışıklar kapatıldı (activePlayer: null)');
+        return; // Zaten yukarıda tüm ışıklar temizlendi
+    }
+    
+    // İhale sürecinde olup olmadığını kontrol et
+    const isAuctionActive = window.auctionActive === true;
+    const hasValidAuctionCurrent = window.auctionCurrent !== undefined && window.auctionCurrent !== null;
+    
+    console.log('renderPlayersWithClick: Işık yönetimi:', {
+        activePlayer,
+        isAuctionActive,
+        hasValidAuctionCurrent,
+        auctionCurrent: window.auctionCurrent,
+        currentPlayer: window.currentPlayer
+    });
+    
+    if (isAuctionActive && hasValidAuctionCurrent) {
+        // İhale sürecinde - sadece auctionCurrent sarı yansın
+        // activePlayer parametresini görmezden gel, window.auctionCurrent kullan
+        const auctionPlayerDiv = document.getElementById(`player${window.auctionCurrent + 1}`);
+        if (auctionPlayerDiv) {
+            auctionPlayerDiv.classList.add('auction-active');
+            console.log(`İhale sürecinde: Oyuncu ${window.auctionCurrent + 1} sarı ışıkla (activePlayer: ${activePlayer} görmezden gelindi)`);
+        }
+    } else if (!isAuctionActive && activePlayer !== null && activePlayer !== undefined) {
+        // Kart atma sırasında - sadece currentPlayer mavi yansın
+        const cardPlayerDiv = document.getElementById(`player${activePlayer + 1}`);
+        if (cardPlayerDiv) {
+            cardPlayerDiv.classList.add('active-player');
+            console.log(`Kart atma sırasında: Oyuncu ${activePlayer + 1} mavi ışıkla`);
+        }
+    } else {
+        // Hiçbir ışık yanmaz
+        console.log('Hiçbir ışık aktif değil - auctionActive:', isAuctionActive, 'auctionCurrent:', window.auctionCurrent);
     }
     
     // Elin başında ilk atılan kartın rengi (leadSuit) belirlenir
@@ -423,12 +495,6 @@ function renderPlayersWithClick(activePlayer) {
         if (!playerDiv) {
             console.error(`player${i+1} elementi bulunamadı`);
             continue;
-        }
-        
-        if (activePlayer === i) {
-            playerDiv.classList.add('active-player');
-        } else {
-            playerDiv.classList.remove('active-player');
         }
         
         const cardsDiv = playerDiv.querySelector('.cards');
@@ -606,7 +672,9 @@ function playCard(playerIdx, card, suit, idxInSuit) {
     // Bot kontrolü - sıradaki oyuncu bot mu?
     if (playedCards.length < 4) {
         window.currentPlayer = (window.currentPlayer + 1) % 4;
-        renderPlayersWithClick(window.currentPlayer);
+        if (window.currentPlayer !== undefined && window.currentPlayer !== null) {
+            renderPlayersWithClick(window.currentPlayer);
+        }
         
         // Eğer sıradaki oyuncu bot ise, otomatik oyna
         if (window.botManager && window.botManager.isBotActive(window.currentPlayer)) {
@@ -640,7 +708,9 @@ function playCard(playerIdx, card, suit, idxInSuit) {
             renderCenterCards();
             firstPlayerOfTrick = winner;
             window.currentPlayer = winner;
-            renderPlayersWithClick(window.currentPlayer);
+            if (window.currentPlayer !== undefined && window.currentPlayer !== null) {
+                renderPlayersWithClick(window.currentPlayer);
+            }
             
             // Eğer sıradaki oyuncu bot ise, otomatik oyna
             if (window.botManager && window.botManager.isBotActive(window.currentPlayer)) {
@@ -727,11 +797,17 @@ function findTrickWinner() {
 }
 
 function getPlayerName(playerIndex) {
+    // Geçersiz playerIndex kontrolü
+    if (playerIndex === null || playerIndex === undefined || playerIndex < 0 || playerIndex > 3) {
+        console.warn('getPlayerName: Geçersiz playerIndex:', playerIndex);
+        return 'Bilinmeyen Oyuncu';
+    }
+    
     // Oyuncu isimlerini al
     const playerNames = ['Oyuncu 1', 'Oyuncu 2', 'Oyuncu 3', 'Oyuncu 4'];
     
     // Eğer window.players varsa, gerçek isimleri kullan
-    if (window.players && window.players[playerIndex]) {
+    if (window.players && Array.isArray(window.players) && window.players[playerIndex]) {
         return window.players[playerIndex].name || `Oyuncu ${playerIndex + 1}`;
     }
     
@@ -1324,13 +1400,180 @@ function setupDealButton() {
         if (dealBtn.dataset.listenerAttached === 'true') {
             return;
         }
-        dealBtn.addEventListener('click', () => {
-            console.log('Kartları dağıt butonuna tıklandı');
+        
+        // Butonun durumunu güncelle
+        function updateDealButtonState() {
+            // Dağıtıcı bilgisini kontrol et
+            const hasValidDealer = window.currentDealer !== undefined && window.currentDealer !== null;
+            
+            if (!hasValidDealer) {
+                // Geçerli dağıtıcı bilgisi yoksa butonu devre dışı bırak
+                dealBtn.disabled = true;
+                dealBtn.style.opacity = '0.5';
+                dealBtn.style.cursor = 'not-allowed';
+                dealBtn.style.backgroundColor = '#ccc';
+                dealBtn.textContent = 'Kartları Dağıt';
+                dealBtn.title = 'Dağıtıcı bilgisi bulunamadı';
+                console.log('Dağıtma butonu devre dışı: Geçerli dağıtıcı bilgisi yok');
+                return;
+            }
+            
+            // Kartlar zaten dağıtılmış mı kontrol et
+            const cardsAlreadyDealt = window.playersGlobal && 
+                Array.isArray(window.playersGlobal) && 
+                window.playersGlobal.length === 4 && 
+                window.playersGlobal.every(playerCards => Array.isArray(playerCards) && playerCards.length > 0);
+            
+            if (cardsAlreadyDealt) {
+                // Kartlar zaten dağıtılmış, butonu pasif hale getir
+                dealBtn.disabled = true;
+                dealBtn.style.opacity = '0.5';
+                dealBtn.style.cursor = 'not-allowed';
+                dealBtn.style.backgroundColor = '#ccc';
+                dealBtn.textContent = 'Kartlar Zaten Dağıtıldı';
+                dealBtn.title = 'Kartlar otomatik olarak dağıtıldı';
+                console.log('Dağıtma butonu pasif: Kartlar zaten dağıtıldı');
+                return;
+            }
+            
+            // Gerçek oyuncu kimliğini belirle
+            let realCurrentPlayer = null;
+            
+            console.log('Gerçek oyuncu kimliği belirleniyor:', {
+                isOnlineMode: window.isOnlineMode,
+                onlineCurrentPlayer: window.onlineCurrentPlayer,
+                currentPlayer: window.currentPlayer,
+                socket: !!window.socket,
+                players: window.players
+            });
+            
+            if (window.isOnlineMode) {
+                // Online modda: window.onlineCurrentPlayer veya socket.id ile belirle
+                if (window.onlineCurrentPlayer !== undefined && window.onlineCurrentPlayer !== null) {
+                    realCurrentPlayer = window.onlineCurrentPlayer;
+                    console.log('Online modda onlineCurrentPlayer kullanıldı:', realCurrentPlayer);
+                } else if (window.socket && window.players) {
+                    // Socket ID ile oyuncu pozisyonunu bul
+                    const currentPlayer = window.players.find(p => p.id === window.socket.id);
+                    if (currentPlayer) {
+                        realCurrentPlayer = currentPlayer.position;
+                        console.log('Online modda socket.id ile oyuncu pozisyonu bulundu:', realCurrentPlayer);
+                    }
+                }
+            } else {
+                // Offline modda: Sabit olarak 0 (ilk oyuncu) veya window.currentPlayer
+                realCurrentPlayer = window.currentPlayer !== undefined && window.currentPlayer !== null ? window.currentPlayer : 0;
+                console.log('Offline modda currentPlayer kullanıldı:', realCurrentPlayer);
+            }
+            
+            if (realCurrentPlayer === null) {
+                // Gerçek oyuncu kimliği belirlenemedi
+                dealBtn.disabled = true;
+                dealBtn.style.opacity = '0.5';
+                dealBtn.style.cursor = 'not-allowed';
+                dealBtn.style.backgroundColor = '#ccc';
+                dealBtn.textContent = 'Kartları Dağıt';
+                dealBtn.title = 'Oyuncu kimliği belirlenemedi';
+                console.log('Dağıtma butonu devre dışı: Oyuncu kimliği belirlenemedi');
+                return;
+            }
+            
+            console.log('Gerçek oyuncu kimliği belirlendi:', realCurrentPlayer);
+            
+            const isCurrentPlayerDealer = realCurrentPlayer === window.currentDealer;
+            const dealerName = window.getPlayerName ? window.getPlayerName(window.currentDealer) : `Oyuncu ${window.currentDealer + 1}`;
+            
+            // Buton metnini güncelle
+            dealBtn.textContent = `Kartları Dağıt (${dealerName})`;
+            dealBtn.title = `Sadece ${dealerName} kartları dağıtabilir`;
+            
+            // Eğer mevcut oyuncu dağıtıcı değilse butonu devre dışı bırak
+            if (!isCurrentPlayerDealer) {
+                dealBtn.disabled = true;
+                dealBtn.style.opacity = '0.5';
+                dealBtn.style.cursor = 'not-allowed';
+                dealBtn.style.backgroundColor = '#ccc';
+                console.log(`Dağıtma hakkı yok: Gerçek oyuncu ${realCurrentPlayer + 1}, Dağıtıcı ${window.currentDealer + 1}`);
+            } else {
+                dealBtn.disabled = false;
+                dealBtn.style.opacity = '1';
+                dealBtn.style.cursor = 'pointer';
+                dealBtn.style.backgroundColor = '';
+                console.log(`Dağıtma hakkı var: Oyuncu ${realCurrentPlayer + 1} dağıtabilir`);
+            }
+        }
+        
+        // Sayfa yüklendiğinde buton durumunu güncelle
+        updateDealButtonState();
+        
+        // Her 1 saniyede bir buton durumunu kontrol et (oyuncu değişiklikleri için)
+        setInterval(() => {
+            console.log('Deal button state güncelleniyor:', {
+                currentDealer: window.currentDealer,
+                currentPlayer: window.currentPlayer,
+                onlineCurrentPlayer: window.onlineCurrentPlayer,
+                isOnlineMode: window.isOnlineMode
+            });
+            updateDealButtonState();
+        }, 1000);
+        
+        // Her 1 saniyede bir ışık durumunu kontrol et ve güncelle
+        setInterval(() => {
+            // İhale sürecinde auctionCurrent, kart atma sırasında currentPlayer kullan
+            if (window.auctionActive && window.auctionCurrent !== undefined && window.auctionCurrent !== null) {
+                // İhale sürecinde - auctionCurrent ile çağır
+                if (window.renderPlayersWithClick) {
+                    window.renderPlayersWithClick(window.auctionCurrent);
+                }
+            } else if (window.currentPlayer !== undefined && window.currentPlayer !== null) {
+                // Kart atma sırasında - currentPlayer ile çağır
+                if (window.renderPlayersWithClick) {
+                    window.renderPlayersWithClick(window.currentPlayer);
+                }
+            }
+        }, 1000);
+        
+        // Sadece offline modda event listener ekle
+        if (!window.isOnlineMode) {
+            dealBtn.addEventListener('click', () => {
+                console.log('Kartları dağıt butonuna tıklandı (offline mod)');
+            
+            // Dağıtıcı bilgisini kontrol et
+            const hasValidDealer = window.currentDealer !== undefined && window.currentDealer !== null;
+            
+            if (!hasValidDealer) {
+                console.log('Dağıtma hakkı yok: Geçerli dağıtıcı bilgisi bulunamadı');
+                return;
+            }
+            
+            // Gerçek oyuncu kimliğini belirle (updateDealButtonState ile aynı mantık)
+            let realCurrentPlayer = null;
+            
+            if (window.isOnlineMode) {
+                // Online modda: window.onlineCurrentPlayer veya socket.id ile belirle
+                if (window.onlineCurrentPlayer !== undefined && window.onlineCurrentPlayer !== null) {
+                    realCurrentPlayer = window.onlineCurrentPlayer;
+                } else if (window.socket && window.players) {
+                    // Socket ID ile oyuncu pozisyonunu bul
+                    const currentPlayer = window.players.find(p => p.id === window.socket.id);
+                    if (currentPlayer) {
+                        realCurrentPlayer = currentPlayer.position;
+                    }
+                }
+            } else {
+                // Offline modda: Sabit olarak 0 (ilk oyuncu) veya window.currentPlayer
+                realCurrentPlayer = window.currentPlayer !== undefined && window.currentPlayer !== null ? window.currentPlayer : 0;
+            }
+            
+            if (realCurrentPlayer === null) {
+                console.log('Dağıtma hakkı yok: Oyuncu kimliği belirlenemedi');
+                return;
+            }
             
             // Sadece dağıtma sırası gelen oyuncu kartları dağıtabilir
-            if (window.currentPlayer && window.currentPlayer !== window.currentDealer) {
-                const dealerName = window.getPlayerName(window.currentDealer);
-                // Not: İstek üzerine sesli okuma devre dışı
+            if (realCurrentPlayer !== window.currentDealer) {
+                const dealerName = window.getPlayerName ? window.getPlayerName(window.currentDealer) : `Oyuncu ${window.currentDealer + 1}`;
+                console.log(`${dealerName} kartları dağıtabilir, siz değilsiniz!`);
                 return;
             }
             
@@ -1340,14 +1583,24 @@ function setupDealButton() {
                 console.log('Room ID:', window.currentRoom);
                 console.log('Socket connected:', window.socket.connected);
                 
-                // dealCardsOnline fonksiyonunu çağır
-                if (window.dealCardsOnline) {
-                    window.dealCardsOnline();
-                } else {
-                    console.error('dealCardsOnline fonksiyonu bulunamadı!');
-                    window.socket.emit('dealCards', { roomId: window.currentRoom });
-                }
-                return;
+                            // dealCardsOnline fonksiyonunu çağır
+            if (window.dealCardsOnline) {
+                window.dealCardsOnline();
+            } else {
+                console.error('dealCardsOnline fonksiyonu bulunamadı!');
+                window.socket.emit('dealCards', { roomId: window.currentRoom });
+            }
+            
+            // Kartlar dağıtıldıktan sonra butonu pasif hale getir
+            dealBtn.disabled = true;
+            dealBtn.style.opacity = '0.5';
+            dealBtn.style.cursor = 'not-allowed';
+            dealBtn.style.backgroundColor = '#ccc';
+            dealBtn.textContent = 'Kartlar Dağıtılıyor...';
+            dealBtn.title = 'Kartlar dağıtılıyor, lütfen bekleyin';
+            console.log('Dağıtma butonu pasif hale getirildi: Kartlar dağıtılıyor');
+            
+            return;
             }
             
             console.log('Offline modda kartlar dağıtılıyor');
@@ -1388,7 +1641,7 @@ function setupDealButton() {
                 const player2Name = getPlayerName(1);
                 const player4Name = getPlayerName(3);
                 html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 1</td><td style="padding:4px;border:1px solid #ddd;">0</td></tr>`;
-                html += `<tr style='font-weight:bold;background:#eee;'><td style="padding:4px;border:1px solid #ddd;">Takım 2</td><td style="padding:4px;border:1px solid #ddd;">0</td></tr>`;
+                html += `<tr style='font-weight:bold;background:#eee;color:#222;'><td style="padding:4px;border:1px solid #ddd;">Takım 2</td><td style="padding:4px;border:1px solid #ddd;">0</td></tr>`;
                 html += `<tr style='font-weight:bold;background:#ffd700;color:#222;'><td style="padding:4px;border:1px solid #ddd;">Birikimli Takım 1</td><td style="padding:4px;border:1px solid #ddd;">${cumulativeTeam1Score}</td></tr>`;
                 html += `<tr style='font-weight:bold;background:#ffd700;color:#222;'><td style="padding:4px;border:1px solid #ddd;">Birikimli Takım 2</td><td style="padding:4px;border:1px solid #ddd;">${cumulativeTeam2Score}</td></tr>`;
                 html += '</table>';
@@ -1432,9 +1685,22 @@ function setupDealButton() {
             lastTrickWinnerTeam = null;
             renderPlayers(players);
             renderCenterCards();
+            
+            // Kartlar dağıtıldıktan sonra butonu pasif hale getir
+            dealBtn.disabled = true;
+            dealBtn.style.opacity = '0.5';
+            dealBtn.style.cursor = 'not-allowed';
+            dealBtn.style.backgroundColor = '#ccc';
+            dealBtn.textContent = 'Kartlar Zaten Dağıtıldı';
+            dealBtn.title = 'Kartlar dağıtıldı';
+            console.log('Dağıtma butonu pasif hale getirildi: Kartlar offline modda dağıtıldı');
+            
             window.offlineStartAuction();
-        });
-        console.log('Kartları dağıt butonu event listener eklendi');
+            });
+            console.log('Kartları dağıt butonu event listener eklendi (offline mod)');
+        } else {
+            console.log('Online mod aktif, script.js deal butonu event listener eklenmiyor');
+        }
         dealBtn.dataset.listenerAttached = 'true';
     } else {
         console.error('dealBtn bulunamadı!');
@@ -1589,6 +1855,14 @@ function calculateEndGameScores() {
     // Dağıtıcı sırasını değiştir (bir sonraki oyuncu dağıtacak)
     window.currentDealer = (window.currentDealer + 1) % 4;
     
+    // Oyun bittiğinde tüm ışıkları kapat
+    for (let i = 0; i < 4; i++) {
+        const playerDiv = document.getElementById(`player${i+1}`);
+        if (playerDiv) {
+            playerDiv.classList.remove('active-player', 'auction-active');
+        }
+    }
+    
     // Oyun bittiğinde oyun durumunu sıfırla ki buton aktif olsun
     window.currentPlayer = null;
     auctionActive = false;
@@ -1654,10 +1928,25 @@ window.updateDealButton = function() {
             dealBtn.style.cursor = 'not-allowed';
             dealBtn.style.display = 'none'; // Navbar'da gizle
         } else {
-            // Oyun başlamamışsa buton aktif
-            dealBtn.disabled = false;
-            dealBtn.style.opacity = '1';
-            dealBtn.style.cursor = 'pointer';
+            // Oyun başlamamışsa buton aktif - ama sadece dağıtıcı için
+            if (window.currentPlayer !== undefined && window.currentDealer !== undefined) {
+                const isCurrentPlayerDealer = window.currentPlayer === window.currentDealer;
+                
+                if (!isCurrentPlayerDealer) {
+                    // Eğer mevcut oyuncu dağıtıcı değilse butonu devre dışı bırak
+                    dealBtn.disabled = true;
+                    dealBtn.style.opacity = '0.5';
+                    dealBtn.style.cursor = 'not-allowed';
+                    dealBtn.style.backgroundColor = '#ccc';
+                } else {
+                    // Eğer mevcut oyuncu dağıtıcı ise butonu aktif et
+                    dealBtn.disabled = false;
+                    dealBtn.style.opacity = '1';
+                    dealBtn.style.cursor = 'pointer';
+                    dealBtn.style.backgroundColor = '';
+                }
+            }
+            
             dealBtn.style.display = 'block'; // Navbar'da göster
             
             // Eğer dağıtıcı bot ise, otomatik kart dağıt
@@ -1707,8 +1996,15 @@ window.onload = function() {
     window.potaChatLog = [];
 
     function getCurrentPlayerNumber() {
-        if (typeof auctionActive !== 'undefined' && auctionActive) return auctionCurrent + 1;
-        if (typeof window.currentPlayer !== 'undefined' && window.currentPlayer !== null) return window.currentPlayer + 1;
+        // İhale sürecinde auctionCurrent'ı döndür
+        if (typeof window.auctionActive !== 'undefined' && window.auctionActive === true && 
+            typeof window.auctionCurrent !== 'undefined' && window.auctionCurrent !== null) {
+            return window.auctionCurrent + 1;
+        }
+        // Kart atma sırasında currentPlayer'ı döndür
+        if (typeof window.currentPlayer !== 'undefined' && window.currentPlayer !== null) {
+            return window.currentPlayer + 1;
+        }
         return '?';
     }
 
@@ -1781,18 +2077,7 @@ window.onload = function() {
             addPotaMessage(text, playerNum);
             // Not: İstek üzerine sesli okuma devre dışı
             
-            // Koz belirlenmeden önce oyun akışını etkilesin, belirlendikten sonra sadece sohbet olsun
-            if (trumpSuit === null) {
-                // Koz belirlenmeden önce: sıra değişsin
-                if (typeof auctionActive !== 'undefined' && auctionActive) {
-                    auctionTurns++;
-                    auctionCurrent = (auctionCurrent + 1) % 4;
-                    nextAuctionTurn();
-                } else if (typeof window.currentPlayer !== 'undefined' && window.currentPlayer !== null) {
-                    window.currentPlayer = (window.currentPlayer + 1) % 4;
-                    renderPlayersWithClick(window.currentPlayer);
-                }
-            }
+            // Pota kutusu artık ihale sürecini etkilemiyor - sadece sohbet amaçlı
         }
         
         potaChatInput.value = '';

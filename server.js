@@ -129,6 +129,7 @@ function createRoom(roomId) {
         id: roomId,
         players: [],
         gameState: null,
+        gameActive: false, // Oyun aktif mi flag'i
         currentDealer: 3,
         auctionActive: false,
         trumpSuit: null,
@@ -289,24 +290,21 @@ io.on('connection', (socket) => {
             socket.emit('error', { message: 'Oyun başlatılamaz. 4 oyuncu gerekli.' });
             return;
         }
-
-        // Kartları dağıt
-        const deck = createAndShuffleDeck();
-        const playerCards = dealCards(deck);
         
-        // Oyunculara kartları ata
-        room.players.forEach((player, index) => {
-            player.cards = playerCards[index];
-        });
+        // Oyun zaten aktifse tekrar başlatma
+        if (room.gameActive) {
+            console.log(`Oda ${roomId}'de oyun zaten aktif, tekrar başlatılmıyor`);
+            return;
+        }
 
-        // Oyun durumunu başlat
+        // Oyun durumunu başlat (kartlar henüz dağıtılmadı)
         room.gameState = {
             players: room.players,
             currentDealer: room.currentDealer,
-            auctionActive: true,
+            auctionActive: false, // İhale henüz aktif değil, kartlar dağıtıldıktan sonra aktif olacak
             trumpSuit: null,
             playedCards: [],
-            currentPlayer: (room.currentDealer + 1) % 4, // İlk teklifçi
+            currentPlayer: null,
             auctionCurrent: (room.currentDealer + 1) % 4,
             auctionHighestBid: 150,
             auctionWinner: null,
@@ -314,14 +312,25 @@ io.on('connection', (socket) => {
             lastBidderId: null
         };
 
-        // Tüm oyunculara oyun başladığını bildir
+        // Oyun durumunu işaretle
+        room.gameActive = true;
+        
+        // Debug log
+        console.log(`Oda ${roomId} oyun durumu:`, {
+            gameActive: room.gameActive,
+            playersCount: room.players.length,
+            auctionActive: room.gameState.auctionActive,
+            currentDealer: room.currentDealer
+        });
+        
+        // Tüm oyunculara oyun başladığını bildir (kartlar henüz dağıtılmadı)
         io.to(roomId).emit('gameStarted', { 
             gameState: room.gameState,
             currentDealer: room.currentDealer,
-            playerCards: playerCards
+            playerCards: [] // Kartlar henüz dağıtılmadı
         });
 
-        console.log(`Oda ${roomId}'de oyun başladı, kartlar dağıtıldı`);
+        console.log(`Oda ${roomId}'de oyun başladı, kartlar henüz dağıtılmadı`);
     });
 
     // Kart oynama
@@ -724,7 +733,7 @@ io.on('connection', (socket) => {
             auctionActive: true, // İhale aktif olmalı
             trumpSuit: null,
             playedCards: [],
-            currentPlayer: null,
+            currentPlayer: (room.currentDealer + 1) % 4, // İlk teklifçi
             auctionCurrent: (room.currentDealer + 1) % 4,
             auctionHighestBid: 150,
             auctionWinner: null,
@@ -746,7 +755,45 @@ io.on('connection', (socket) => {
             }
         });
 
-        console.log(`Kartlar dağıtıldı - Oda: ${roomId}, Dağıtıcı: ${room.currentDealer}`);
+        // İhale sürecini başlat
+        io.to(roomId).emit('auctionStarted', {
+            auctionCurrent: room.gameState.auctionCurrent,
+            auctionHighestBid: 150,
+            players: playersWithCards
+        });
+
+        console.log(`Kartlar dağıtıldı ve ihale başladı - Oda: ${roomId}, Dağıtıcı: ${room.currentDealer}, İlk teklifçi: ${room.gameState.auctionCurrent}`);
+    });
+
+    // Oyun yeniden başlatma
+    socket.on('restartGame', (data) => {
+        const { roomId } = data;
+        const room = rooms.get(roomId);
+        
+        if (!room) {
+            socket.emit('error', { message: 'Oda bulunamadı' });
+            return;
+        }
+
+        // Oyun durumunu sıfırla
+        room.gameState = null;
+        room.gameActive = false;
+        room.auctionActive = false;
+        room.trumpSuit = null;
+        room.playedCards = [];
+        room.currentPlayer = null;
+        room.auctionCurrent = 0;
+        room.auctionHighestBid = 150;
+        room.auctionWinner = null;
+        room.consecutiveBozCount = 0;
+
+        // Tüm oyunculara oyun yeniden başlatıldı mesajı gönder
+        io.to(roomId).emit('gameRestarted', { 
+            message: 'Oyun yeniden başlatıldı',
+            players: room.players.map(p => ({ id: p.id, name: p.name, position: p.position }))
+        });
+
+        console.log(`Oda ${roomId}'de oyun yeniden başlatıldı`);
     });
 });
 

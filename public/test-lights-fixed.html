@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Light System Test - Fixed</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: white;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #444;
+            border-radius: 5px;
+            background: #16213e;
+        }
+        .player-box {
+            display: inline-block;
+            margin: 10px;
+            padding: 15px;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            text-align: center;
+            background: #0f3460;
+            min-width: 120px;
+            transition: all 0.3s ease;
+        }
+        .active-player {
+            box-shadow: 0 0 24px 6px #fff, 0 0 0 4px #00e6ff;
+            border: 2px solid #00e6ff;
+            z-index: 15;
+        }
+        .auction-active {
+            box-shadow: 0 0 32px 10px #fff, 0 0 0 4px #ffd700;
+            border: 2.5px solid #ffd700;
+            z-index: 4;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            color: #333;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .control-group {
+            border: 1px solid #444;
+            padding: 15px;
+            border-radius: 5px;
+            background: #16213e;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎯 Light System Test - Fixed</h1>
+    
+    <div class="test-section">
+        <h3>👥 Oyuncu Kutuları:</h3>
+        <div id="player1" class="player-box">Oyuncu 1</div>
+        <div id="player2" class="player-box">Oyuncu 2</div>
+        <div id="player3" class="player-box">Oyuncu 3</div>
+        <div id="player4" class="player-box">Oyuncu 4</div>
+    </div>
+    
+    <div class="controls">
+        <div class="control-group">
+            <h3>🎮 Oyun Durumu:</h3>
+            <button onclick="setAuctionActive(true)">İhale Başlat</button>
+            <button onclick="setAuctionActive(false)">İhale Bitir</button>
+            <br><br>
+            <button onclick="setAuctionCurrent(0)">İhale Sırası: Oyuncu 1</button>
+            <button onclick="setAuctionCurrent(1)">İhale Sırası: Oyuncu 2</button>
+            <button onclick="setAuctionCurrent(2)">İhale Sırası: Oyuncu 3</button>
+            <button onclick="setAuctionCurrent(3)">İhale Sırası: Oyuncu 4</button>
+        </div>
+        
+        <div class="control-group">
+            <h3>🎴 Kart Atma:</h3>
+            <button onclick="setCurrentPlayer(0)">Aktif Oyuncu: Oyuncu 1</button>
+            <button onclick="setCurrentPlayer(1)">Aktif Oyuncu: Oyuncu 2</button>
+            <button onclick="setCurrentPlayer(2)">Aktif Oyuncu: Oyuncu 3</button>
+            <button onclick="setCurrentPlayer(3)">Aktif Oyuncu: Oyuncu 4</button>
+            <br><br>
+            <button onclick="clearAllLights()">Tüm Işıkları Temizle</button>
+            <button onclick="testRenderPlayersWithClick()">renderPlayersWithClick Test Et</button>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>📊 Durum Bilgisi:</h3>
+        <div class="status">
+            <strong>İhale Aktif:</strong> <span id="auction-active-status">Hayır</span><br>
+            <strong>İhale Sırası:</strong> <span id="auction-current-status">-</span><br>
+            <strong>Aktif Oyuncu:</strong> <span id="current-player-status">-</span><br>
+            <strong>Aktif Işıklar:</strong> <span id="active-lights-status">Hiçbiri</span>
+        </div>
+    </div>
+
+    <script>
+        // Global değişkenler
+        window.auctionActive = false;
+        window.auctionCurrent = undefined;
+        window.currentPlayer = undefined;
+        window.playersGlobal = [[], [], [], []]; // Boş eller
+        
+        // Oyuncu isimlerini al
+        window.getPlayerName = function(playerIndex) {
+            return `Oyuncu ${playerIndex + 1}`;
+        };
+        
+        // İhale durumunu ayarla
+        function setAuctionActive(active) {
+            window.auctionActive = active;
+            updateStatus();
+            console.log(`İhale durumu: ${active ? 'Aktif' : 'Pasif'}`);
+        }
+        
+        // İhale sırasını ayarla
+        function setAuctionCurrent(playerIndex) {
+            window.auctionCurrent = playerIndex;
+            updateStatus();
+            console.log(`İhale sırası: Oyuncu ${playerIndex + 1}`);
+        }
+        
+        // Aktif oyuncuyu ayarla
+        function setCurrentPlayer(playerIndex) {
+            window.currentPlayer = playerIndex;
+            updateStatus();
+            console.log(`Aktif oyuncu: Oyuncu ${playerIndex + 1}`);
+        }
+        
+        // Tüm ışıkları temizle
+        function clearAllLights() {
+            for (let i = 1; i <= 4; i++) {
+                const playerDiv = document.getElementById(`player${i}`);
+                if (playerDiv) {
+                    playerDiv.classList.remove('active-player', 'auction-active');
+                }
+            }
+            updateStatus();
+            console.log('Tüm ışıklar temizlendi');
+        }
+        
+        // Durumu güncelle
+        function updateStatus() {
+            document.getElementById('auction-active-status').textContent = window.auctionActive ? 'Evet' : 'Hayır';
+            document.getElementById('auction-current-status').textContent = window.auctionCurrent !== undefined ? `Oyuncu ${window.auctionCurrent + 1}` : '-';
+            document.getElementById('current-player-status').textContent = window.currentPlayer !== undefined ? `Oyuncu ${window.currentPlayer + 1}` : '-';
+            
+            // Aktif ışıkları say
+            let activeLights = [];
+            for (let i = 1; i <= 4; i++) {
+                const playerDiv = document.getElementById(`player${i}`);
+                if (playerDiv) {
+                    if (playerDiv.classList.contains('active-player')) {
+                        activeLights.push(`Oyuncu ${i} (Mavi)`);
+                    }
+                    if (playerDiv.classList.contains('auction-active')) {
+                        activeLights.push(`Oyuncu ${i} (Sarı)`);
+                    }
+                }
+            }
+            document.getElementById('active-lights-status').textContent = activeLights.length > 0 ? activeLights.join(', ') : 'Hiçbiri';
+        }
+        
+        // renderPlayersWithClick fonksiyonunu test et
+        function testRenderPlayersWithClick() {
+            console.log('renderPlayersWithClick test ediliyor...');
+            if (typeof window.renderPlayersWithClick === 'function') {
+                // Aktif oyuncu olarak auctionCurrent veya currentPlayer kullan
+                let activePlayer = null;
+                if (window.auctionActive && window.auctionCurrent !== undefined) {
+                    activePlayer = window.auctionCurrent;
+                } else if (window.currentPlayer !== undefined) {
+                    activePlayer = window.currentPlayer;
+                }
+                
+                window.renderPlayersWithClick(activePlayer);
+                console.log('renderPlayersWithClick çağrıldı, activePlayer:', activePlayer);
+            } else {
+                console.log('renderPlayersWithClick fonksiyonu bulunamadı');
+            }
+            updateStatus();
+        }
+        
+        // Sayfa yüklendiğinde
+        window.onload = function() {
+            updateStatus();
+            console.log('Test sayfası yüklendi');
+        };
+    </script>
+</body>
+</html>

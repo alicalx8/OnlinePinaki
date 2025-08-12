@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Işık Sistemi Test - Gelişmiş</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .test-container {
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 10px;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .test-button.danger {
+            background: #dc3545;
+        }
+        .test-button.danger:hover {
+            background: #c82333;
+        }
+        .player-box {
+            display: inline-block;
+            width: 150px;
+            height: 100px;
+            margin: 10px;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            text-align: center;
+            line-height: 100px;
+            font-weight: bold;
+            position: relative;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 5px;
+        }
+        .light-status {
+            margin: 10px 0;
+            padding: 10px;
+            background: #fff;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .console {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🎮 Işık Sistemi Test - Gelişmiş</h1>
+        
+        <div class="status">
+            <h3>📊 Test Durumu:</h3>
+            <p><strong>İhale Aktif:</strong> <span id="auction-status">Hayır</span></p>
+            <p><strong>İhale Sırası:</strong> <span id="auction-current">-</span></p>
+            <p><strong>Kart Atma Sırası:</strong> <span id="current-player">-</span></p>
+        </div>
+        
+        <div class="light-status">
+            <h3>💡 Işık Durumu:</h3>
+            <div id="light-status-display">Tüm ışıklar kapalı</div>
+        </div>
+        
+        <div>
+            <h3>👥 Oyuncu Kutuları:</h3>
+            <div id="player1" class="player-box">Oyuncu 1</div>
+            <div id="player2" class="player-box">Oyuncu 2</div>
+            <div id="player3" class="player-box">Oyuncu 3</div>
+            <div id="player4" class="player-box">Oyuncu 4</div>
+        </div>
+        
+        <div style="margin-top: 30px;">
+            <h3>🧪 Test Butonları:</h3>
+            <button class="test-button" onclick="testAuctionMode()">🟡 İhale Modu Başlat</button>
+            <button class="test-button" onclick="testCardPlayMode()">🔵 Kart Atma Modu</button>
+            <button class="test-button" onclick="testEndAuction()">⏹️ İhaleyi Bitir</button>
+            <button class="test-button" onclick="testEndGame()">🏁 Oyunu Bitir</button>
+            <button class="test-button danger" onclick="clearAllLights()">🧹 Tüm Işıkları Temizle</button>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <h3>🎴 Deal Button Test:</h3>
+            <button class="test-button" onclick="testDealButton()">🔍 Deal Button Durumunu Test Et</button>
+            <button class="test-button" onclick="changeCurrentPlayer()">👤 Mevcut Oyuncuyu Değiştir</button>
+            <div id="deal-button-status" style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 5px; font-family: monospace;"></div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <h3>🌐 Online Mod Simülasyonu:</h3>
+            <button class="test-button" onclick="simulateCardsDealt()">🎴 Kartları Dağıt (4. Oyuncu)</button>
+            <button class="test-button" onclick="simulateAuctionStart()">🚀 İhaleyi Başlat</button>
+            <button class="test-button" onclick="simulateNextBidder()">⏭️ Sıradaki Teklifçi</button>
+        </div>
+        
+        <div class="status">
+            <h3>✅ Beklenen Davranış:</h3>
+            <ul>
+                <li><strong>🟡 İhale Modu:</strong> Sadece sıradaki oyuncunun kutusu sarı yanmalı</li>
+                <li><strong>🔵 Kart Atma Modu:</strong> Sadece sıradaki oyuncunun kutusu mavi yanmalı</li>
+                <li><strong>⏹️ İhale Bitti:</strong> Sarı ışık sönmeli, mavi ışık aktif olmalı</li>
+                <li><strong>🏁 Oyun Bitti:</strong> Tüm ışıklar sönmeli</li>
+                <li><strong>🚫 ÖNEMLİ:</strong> Aynı anda sadece bir ışık yanmalı!</li>
+            </ul>
+        </div>
+        
+        <div class="console" id="console">
+            <div>🎯 Test konsolu başlatıldı...</div>
+        </div>
+    </div>
+
+    <script>
+        // Global değişkenler
+        window.auctionActive = false;
+        window.auctionCurrent = 0;
+        window.currentPlayer = 0;
+        
+        function log(message) {
+            const console = document.getElementById('console');
+            const timestamp = new Date().toLocaleTimeString();
+            console.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            console.scrollTop = console.scrollHeight;
+        }
+        
+        function updateStatus() {
+            document.getElementById('auction-status').textContent = window.auctionActive ? 'Evet' : 'Hayır';
+            document.getElementById('auction-current').textContent = window.auctionActive ? (window.auctionCurrent + 1) : '-';
+            document.getElementById('current-player').textContent = window.currentPlayer + 1;
+        }
+        
+        function updateLightStatus() {
+            const lightStatus = document.getElementById('light-status-display');
+            let status = '';
+            let activeLights = 0;
+            
+            for (let i = 1; i <= 4; i++) {
+                const playerDiv = document.getElementById(`player${i}`);
+                if (playerDiv.classList.contains('auction-active')) {
+                    status += `Oyuncu ${i}: 🟡 Sarı | `;
+                    activeLights++;
+                } else if (playerDiv.classList.contains('active-player')) {
+                    status += `Oyuncu ${i}: 🔵 Mavi | `;
+                    activeLights++;
+                }
+            }
+            
+            if (activeLights === 0) {
+                status = 'Tüm ışıklar kapalı';
+            } else if (activeLights > 1) {
+                status = `⚠️ HATA: ${activeLights} ışık aynı anda yanıyor! ` + status;
+            }
+            
+            lightStatus.innerHTML = status;
+        }
+        
+        function testAuctionMode() {
+            log('🟡 İhale modu test ediliyor...');
+            
+            window.auctionActive = true;
+            window.auctionCurrent = 0;
+            updateStatus();
+            
+            // Önce tüm ışıkları temizle
+            for (let i = 1; i <= 4; i++) {
+                const playerDiv = document.getElementById(`player${i}`);
+                playerDiv.classList.remove('active-player', 'auction-active');
+            }
+            
+            // İhale sürecinde sadece sarı ışık (auction-active)
+            const auctionPlayerDiv = document.getElementById(`player${window.auctionCurrent + 1}`);
+            if (auctionPlayerDiv) {
+                auctionPlayerDiv.classList.add('auction-active');
+                log(`✅ Oyuncu ${window.auctionCurrent + 1} sarı ışıkla işaretlendi`);
+            }
+            
+            updateLightStatus();
+            log('🟡 İhale modu başlatıldı');
+        }
+        
+        function testCardPlayMode() {
+            log('🔵 Kart atma modu test ediliyor...');
+            
+            window.auctionActive = false;
+            window.currentPlayer = 2;
+            updateStatus();
+            
+            // Önce tüm ışıkları temizle
+            for (let i = 1; i <= 4; i++) {
+                const playerDiv = document.getElementById(`player${i}`);
+                playerDiv.classList.remove('active-player', 'auction-active');
+            }
+            
+            // Kart atma sırasında sadece mavi ışık (active-player)
+            const cardPlayerDiv = document.getElementById(`player${window.currentPlayer + 1}`);
+            if (cardPlayerDiv) {
+                cardPlayerDiv.classList.add('active-player');
+                log(`✅ Oyuncu ${window.currentPlayer + 1} mavi ışıkla işaretlendi`);
+            }
+            
+            updateLightStatus();
+            log('🔵 Kart atma modu başlatıldı');
+        }
+        
+        function testEndAuction() {
+            log('⏹️ İhale bitirme test ediliyor...');
+            
+            window.auctionActive = false;
+            updateStatus();
+            
+            // İhale bittiğinde tüm sarı ışıkları kapat
+            for (let i = 1; i <= 4; i++) {
+                const playerDiv = document.getElementById(`player${i}`);
+                if (playerDiv) {
+                    playerDiv.classList.remove('auction-active');
+                }
+            }
+            
+            updateLightStatus();
+            log('⏹️ İhale bitti - Sarı ışıklar söndü');
+        }
+        
+        function testEndGame() {
+            log('🏁 Oyun bitirme test ediliyor...');
+            
+            window.auctionActive = false;
+            window.currentPlayer = null;
+            updateStatus();
+            
+            // Oyun bittiğinde tüm ışıkları kapat
+            for (let i = 1; i <= 4; i++) {
+                const playerDiv = document.getElementById(`player${i}`);
+                if (playerDiv) {
+                    playerDiv.classList.remove('active-player', 'auction-active');
+                }
+            }
+            
+            updateLightStatus();
+            log('🏁 Oyun bitti - Tüm ışıklar söndü');
+        }
+        
+        function clearAllLights() {
+            log('🧹 Tüm ışıklar temizleniyor...');
+            
+            for (let i = 1; i <= 4; i++) {
+                const playerDiv = document.getElementById(`player${i}`);
+                if (playerDiv) {
+                    playerDiv.classList.remove('active-player', 'auction-active');
+                }
+            }
+            
+            window.auctionActive = false;
+            window.auctionCurrent = 0;
+            window.currentPlayer = 0;
+            updateStatus();
+            updateLightStatus();
+            
+            log('🧹 Tüm ışıklar temizlendi');
+        }
+        
+        // Online mod simülasyonu
+        function simulateCardsDealt() {
+            log('🎴 Kartlar dağıtılıyor (4. oyuncu dağıtıcı)...');
+            
+            // 4. oyuncu dağıtıcı olsun
+            window.currentDealer = 3; // 4. oyuncu (index 3)
+            log(`✅ Dağıtıcı: Oyuncu ${window.currentDealer + 1}`);
+            
+            updateStatus();
+        }
+        
+        function simulateAuctionStart() {
+            log('🚀 İhale başlatılıyor...');
+            
+            // Dağıtıcıdan sonraki oyuncu ihale başlatır
+            window.auctionCurrent = (window.currentDealer + 1) % 4; // 1. oyuncu (index 0)
+            window.auctionActive = true;
+            
+            log(`✅ İhale başladı - Sıra: Oyuncu ${window.auctionCurrent + 1}`);
+            
+            // Arayüzü güncelle
+            updateStatus();
+            
+            // Önce tüm ışıkları temizle
+            for (let i = 1; i <= 4; i++) {
+                const playerDiv = document.getElementById(`player${i}`);
+                playerDiv.classList.remove('active-player', 'auction-active');
+            }
+            
+            // İhale sürecinde sadece auctionCurrent sarı yansın
+            const auctionPlayerDiv = document.getElementById(`player${window.auctionCurrent + 1}`);
+            if (auctionPlayerDiv) {
+                auctionPlayerDiv.classList.add('auction-active');
+                log(`🟡 Oyuncu ${window.auctionCurrent + 1} sarı ışıkla işaretlendi`);
+            }
+            
+            updateLightStatus();
+            log('🚀 İhale başlatıldı - Sadece 1. oyuncu teklif verebilir');
+        }
+        
+        function simulateNextBidder() {
+            if (!window.auctionActive) {
+                log('❌ İhale aktif değil!');
+                return;
+            }
+            
+            log('⏭️ Sıradaki teklifçiye geçiliyor...');
+            
+            // Sıradaki oyuncuya geç
+            window.auctionCurrent = (window.auctionCurrent + 1) % 4;
+            
+            log(`✅ Sıra: Oyuncu ${window.auctionCurrent + 1}`);
+            
+            // Arayüzü güncelle
+            updateStatus();
+            
+            // Önce tüm ışıkları temizle
+            for (let i = 1; i <= 4; i++) {
+                const playerDiv = document.getElementById(`player${i}`);
+                playerDiv.classList.remove('active-player', 'auction-active');
+            }
+            
+            // İhale sürecinde sadece auctionCurrent sarı yansın
+            const auctionPlayerDiv = document.getElementById(`player${window.auctionCurrent + 1}`);
+            if (auctionPlayerDiv) {
+                auctionPlayerDiv.classList.add('auction-active');
+                log(`🟡 Oyuncu ${window.auctionCurrent + 1} sarı ışıkla işaretlendi`);
+            }
+            
+            updateLightStatus();
+            log(`⏭️ Sıra Oyuncu ${window.auctionCurrent + 1}'e geçti`);
+        }
+        
+        // Deal button test fonksiyonları
+        function testDealButton() {
+            const dealBtn = document.getElementById('dealBtn');
+            const statusDiv = document.getElementById('deal-button-status');
+            
+            if (!dealBtn) {
+                statusDiv.innerHTML = '❌ Deal button bulunamadı!';
+                return;
+            }
+            
+            const currentPlayer = window.currentPlayer !== undefined ? window.currentPlayer : 'Tanımsız';
+            const currentDealer = window.currentDealer !== undefined ? window.currentDealer : 'Tanımsız';
+            const isCurrentPlayerDealer = window.currentPlayer === window.currentDealer;
+            const isDisabled = dealBtn.disabled;
+            const opacity = dealBtn.style.opacity;
+            const cursor = dealBtn.style.cursor;
+            const backgroundColor = dealBtn.style.backgroundColor;
+            
+            statusDiv.innerHTML = `
+                <strong>Deal Button Durumu:</strong><br>
+                📍 Mevcut Oyuncu: ${currentPlayer + 1} (index: ${currentPlayer})<br>
+                🎯 Dağıtıcı: ${currentDealer + 1} (index: ${currentDealer})<br>
+                ✅ Oyuncu Dağıtıcı mı: ${isCurrentPlayerDealer ? 'Evet' : 'Hayır'}<br>
+                🔒 Buton Devre Dışı: ${isDisabled ? 'Evet' : 'Hayır'}<br>
+                �� Opacity: ${opacity}<br>
+                👆 Cursor: ${cursor}<br>
+                🌈 Background: ${backgroundColor}<br>
+                📝 Text: ${dealBtn.textContent}<br>
+                💡 Title: ${dealBtn.title}
+            `;
+            
+            log(`🔍 Deal button test edildi - Oyuncu ${currentPlayer + 1}, Dağıtıcı ${currentDealer + 1}, Aktif: ${!isDisabled}`);
+        }
+        
+        function changeCurrentPlayer() {
+            if (window.currentPlayer === undefined) {
+                window.currentPlayer = 0;
+            } else {
+                window.currentPlayer = (window.currentPlayer + 1) % 4;
+            }
+            
+            log(`👤 Mevcut oyuncu değiştirildi: Oyuncu ${window.currentPlayer + 1}`);
+            updateStatus();
+            
+            // Deal button durumunu güncelle
+            if (window.setupDealButton) {
+                // setupDealButton fonksiyonunu çağır
+                window.setupDealButton();
+            } else {
+                // Manuel olarak güncelle
+                const dealBtn = document.getElementById('dealBtn');
+                if (dealBtn && window.currentDealer !== undefined) {
+                    const isCurrentPlayerDealer = window.currentPlayer === window.currentDealer;
+                    if (!isCurrentPlayerDealer) {
+                        dealBtn.disabled = true;
+                        dealBtn.style.opacity = '0.5';
+                        dealBtn.style.cursor = 'not-allowed';
+                        dealBtn.style.backgroundColor = '#ccc';
+                    } else {
+                        dealBtn.disabled = false;
+                        dealBtn.style.opacity = '1';
+                        dealBtn.style.cursor = 'pointer';
+                        dealBtn.style.backgroundColor = '';
+                    }
+                }
+            }
+            
+            testDealButton();
+        }
+        
+        // Sayfa yüklendiğinde durumu güncelle
+        updateStatus();
+        updateLightStatus();
+        testDealButton(); // Deal button durumunu da test et
+        log('🎮 Test sayfası yüklendi ve hazır!');
+    </script>
+</body>
+</html>

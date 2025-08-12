@@ -96,13 +96,13 @@ body {
 .card.spades { color: #000; }
 .card.clubs { color: #000; }
 .active-player {
-    box-shadow: 0 0 24px 6px #fff, 0 0 0 4px #ffd700;
-    border: 2px solid #ffd700;
+    box-shadow: 0 0 24px 6px #fff, 0 0 0 4px #00e6ff;
+    border: 2px solid #00e6ff;
     z-index: 15;
 }
 .auction-active {
-    box-shadow: 0 0 32px 10px #fff, 0 0 0 4px #00e6ff;
-    border: 2.5px solid #00e6ff;
+    box-shadow: 0 0 32px 10px #fff, 0 0 0 4px #ffd700;
+    border: 2.5px solid #ffd700;
     z-index: 4;
 }
 #left-panel {

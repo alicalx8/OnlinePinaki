@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deal Button Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .player-info {
+            display: inline-block;
+            margin: 10px;
+            padding: 10px;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .current-player {
+            border-color: #007bff;
+            background-color: #e7f3ff;
+        }
+        .dealer {
+            border-color: #28a745;
+            background-color: #e7f7e7;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎴 Deal Button Test</h1>
+    
+    <div class="test-section">
+        <h3>👥 Oyuncu Durumu:</h3>
+        <div id="player1" class="player-info">Oyuncu 1</div>
+        <div id="player2" class="player-info">Oyuncu 2</div>
+        <div id="player3" class="player-info">Oyuncu 3</div>
+        <div id="player4" class="player-info">Oyuncu 4</div>
+    </div>
+    
+    <div class="test-section">
+        <h3>🎯 Kontroller:</h3>
+        <button onclick="setCurrentPlayer(0)">Oyuncu 1'i Mevcut Yap</button>
+        <button onclick="setCurrentPlayer(1)">Oyuncu 2'yi Mevcut Yap</button>
+        <button onclick="setCurrentPlayer(2)">Oyuncu 3'ü Mevcut Yap</button>
+        <button onclick="setCurrentPlayer(3)">Oyuncu 4'ü Mevcut Yap</button>
+        <br><br>
+        <button onclick="setDealer(0)">Oyuncu 1'i Dağıtıcı Yap</button>
+        <button onclick="setDealer(1)">Oyuncu 2'yi Dağıtıcı Yap</button>
+        <button onclick="setDealer(2)">Oyuncu 3'ü Dağıtıcı Yap</button>
+        <button onclick="setDealer(3)">Oyuncu 4'ü Dağıtıcı Yap</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>🎴 Deal Button:</h3>
+        <button id="dealBtn" onclick="dealCards()">Kartları Dağıt (Oyuncu 1)</button>
+        <div class="status">
+            <strong>Buton Durumu:</strong> <span id="button-status">Aktif</span><br>
+            <strong>Mevcut Oyuncu:</strong> <span id="current-player-display">Oyuncu 1</span><br>
+            <strong>Dağıtıcı:</strong> <span id="dealer-display">Oyuncu 1</span><br>
+            <strong>Buton Aktif mi:</strong> <span id="button-active">Evet</span>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>🔧 Test Fonksiyonları:</h3>
+        <button onclick="testSetupDealButton()">setupDealButton Test Et</button>
+        <button onclick="testUpdateDealButton()">updateDealButton Test Et</button>
+        <button onclick="updateButtonStatus()">Durumu Güncelle</button>
+    </div>
+
+    <script>
+        // Global değişkenler
+        window.currentPlayer = 0;
+        window.currentDealer = 0;
+        window.players = [
+            { name: 'Oyuncu 1' },
+            { name: 'Oyuncu 2' },
+            { name: 'Oyuncu 3' },
+            { name: 'Oyuncu 4' }
+        ];
+        
+        // Oyuncu isimlerini al
+        window.getPlayerName = function(playerIndex) {
+            if (window.players && window.players[playerIndex]) {
+                return window.players[playerIndex].name;
+            }
+            return `Oyuncu ${playerIndex + 1}`;
+        };
+        
+        // Mevcut oyuncuyu ayarla
+        function setCurrentPlayer(playerIndex) {
+            window.currentPlayer = playerIndex;
+            updatePlayerDisplay();
+            updateButtonStatus();
+            console.log(`Mevcut oyuncu: Oyuncu ${playerIndex + 1}`);
+        }
+        
+        // Dağıtıcıyı ayarla
+        function setDealer(playerIndex) {
+            window.currentDealer = playerIndex;
+            updatePlayerDisplay();
+            updateButtonStatus();
+            console.log(`Dağıtıcı: Oyuncu ${playerIndex + 1}`);
+        }
+        
+        // Oyuncu görünümünü güncelle
+        function updatePlayerDisplay() {
+            // Tüm oyuncu kutularından sınıfları kaldır
+            for (let i = 1; i <= 4; i++) {
+                const playerDiv = document.getElementById(`player${i}`);
+                playerDiv.className = 'player-info';
+            }
+            
+            // Mevcut oyuncuyu işaretle
+            if (window.currentPlayer !== undefined) {
+                const currentPlayerDiv = document.getElementById(`player${window.currentPlayer + 1}`);
+                if (currentPlayerDiv) {
+                    currentPlayerDiv.classList.add('current-player');
+                }
+            }
+            
+            // Dağıtıcıyı işaretle
+            if (window.currentDealer !== undefined) {
+                const dealerDiv = document.getElementById(`player${window.currentDealer + 1}`);
+                if (dealerDiv) {
+                    dealerDiv.classList.add('dealer');
+                }
+            }
+        }
+        
+        // Buton durumunu güncelle
+        function updateButtonStatus() {
+            const dealBtn = document.getElementById('dealBtn');
+            const buttonStatus = document.getElementById('button-status');
+            const currentPlayerDisplay = document.getElementById('current-player-display');
+            const dealerDisplay = document.getElementById('dealer-display');
+            const buttonActive = document.getElementById('button-active');
+            
+            if (dealBtn) {
+                const dealerName = window.getPlayerName(window.currentDealer);
+                dealBtn.textContent = `Kartları Dağıt (${dealerName})`;
+                
+                if (window.currentPlayer !== undefined && window.currentDealer !== undefined) {
+                    const isCurrentPlayerDealer = window.currentPlayer === window.currentDealer;
+                    
+                    if (!isCurrentPlayerDealer) {
+                        dealBtn.disabled = true;
+                        dealBtn.style.opacity = '0.5';
+                        dealBtn.style.cursor = 'not-allowed';
+                        dealBtn.style.backgroundColor = '#ccc';
+                        buttonStatus.textContent = 'Pasif (Dağıtıcı değil)';
+                        buttonActive.textContent = 'Hayır';
+                    } else {
+                        dealBtn.disabled = false;
+                        dealBtn.style.opacity = '1';
+                        dealBtn.style.cursor = 'pointer';
+                        dealBtn.style.backgroundColor = '';
+                        buttonStatus.textContent = 'Aktif (Dağıtıcı)';
+                        buttonActive.textContent = 'Evet';
+                    }
+                }
+                
+                currentPlayerDisplay.textContent = `Oyuncu ${window.currentPlayer + 1}`;
+                dealerDisplay.textContent = `Oyuncu ${window.currentDealer + 1}`;
+            }
+        }
+        
+        // setupDealButton fonksiyonunu test et
+        function testSetupDealButton() {
+            console.log('setupDealButton test ediliyor...');
+            if (typeof window.setupDealButton === 'function') {
+                window.setupDealButton();
+                console.log('setupDealButton çağrıldı');
+            } else {
+                console.log('setupDealButton fonksiyonu bulunamadı');
+            }
+            updateButtonStatus();
+        }
+        
+        // updateDealButton fonksiyonunu test et
+        function testUpdateDealButton() {
+            console.log('updateDealButton test ediliyor...');
+            if (typeof window.updateDealButton === 'function') {
+                window.updateDealButton();
+                console.log('updateDealButton çağrıldı');
+            } else {
+                console.log('updateDealButton fonksiyonu bulunamadı');
+            }
+            updateButtonStatus();
+        }
+        
+        // Kartları dağıt
+        function dealCards() {
+            if (window.currentPlayer !== undefined && window.currentPlayer !== window.currentDealer) {
+                const dealerName = window.getPlayerName(window.currentDealer);
+                alert(`${dealerName} kartları dağıtabilir, siz değilsiniz!`);
+                return;
+            }
+            alert('Kartlar dağıtılıyor...');
+        }
+        
+        // Sayfa yüklendiğinde
+        window.onload = function() {
+            updatePlayerDisplay();
+            updateButtonStatus();
+            console.log('Test sayfası yüklendi');
+        };
+    </script>
+</body>
+</html>

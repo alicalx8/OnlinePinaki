@@ -1452,7 +1452,7 @@ function setupDealButton() {
                 if (window.onlineCurrentPlayer !== undefined && window.onlineCurrentPlayer !== null) {
                     realCurrentPlayer = window.onlineCurrentPlayer;
                     console.log('Online modda onlineCurrentPlayer kullanıldı:', realCurrentPlayer);
-                } else if (window.socket && window.players) {
+                } else if (window.socket && window.players && Array.isArray(window.players)) {
                     // Socket ID ile oyuncu pozisyonunu bul
                     const currentPlayer = window.players.find(p => p.id === window.socket.id);
                     if (currentPlayer) {
@@ -1553,7 +1553,7 @@ function setupDealButton() {
                 // Online modda: window.onlineCurrentPlayer veya socket.id ile belirle
                 if (window.onlineCurrentPlayer !== undefined && window.onlineCurrentPlayer !== null) {
                     realCurrentPlayer = window.onlineCurrentPlayer;
-                } else if (window.socket && window.players) {
+                } else if (window.socket && window.players && Array.isArray(window.players)) {
                     // Socket ID ile oyuncu pozisyonunu bul
                     const currentPlayer = window.players.find(p => p.id === window.socket.id);
                     if (currentPlayer) {
